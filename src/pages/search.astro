@@ -1,0 +1,57 @@
+---
+import Base from '../layouts/Base.astro'
+import { fetchPosts, fetchAuthors, parseMaybeJsonArray } from '../lib/api'
+import { HorizontalCard } from '../components/Cards'
+
+const query = Astro.url.searchParams.get('q') || ''
+const posts = await fetchPosts()
+
+const allAuthorIds = [...new Set(posts.flatMap((p) => parseMaybeJsonArray(p.authors)))]
+const authorsList = await fetchAuthors(allAuthorIds)
+const authorsMap = new Map(authorsList.map((a) => [a.id, a]))
+
+const lowerQuery = query.toLowerCase()
+
+const filteredPosts = posts
+  .filter((post) => {
+    return (
+      (post.title || '').toLowerCase().includes(lowerQuery) ||
+      (post.description || '').toLowerCase().includes(lowerQuery) ||
+      (post.content || '').toLowerCase().includes(lowerQuery)
+    )
+  })
+  .sort((a, b) => {
+    const da = new Date(a.publishedAt || a.updatedAt || 0).getTime()
+    const db = new Date(b.publishedAt || b.updatedAt || 0).getTime()
+    return db - da
+  })
+---
+
+<Base title="搜尋" noindex={true}>
+  <div class="max-w-[1240px] mx-auto px-4 md:px-6 xl:px-8 pt-10 min-h-[60vh]">
+    <div class="mb-12 border-b border-[var(--border)] pb-6 flex items-baseline gap-4">
+      <h1 class="text-4xl font-serif font-black text-[var(--ink)]">搜尋結果</h1>
+      {query && <span class="text-xl text-[var(--ink-soft)]">"{query}"</span>}
+    </div>
+
+    {
+      !query ? (
+        <div class="text-center py-20 text-[var(--ink-soft)]">
+          請在上方的搜尋框輸入關鍵字開始搜尋。
+        </div>
+      ) : filteredPosts.length === 0 ? (
+        <div class="text-center py-20 text-[var(--ink-soft)]">
+          <p class="text-2xl font-bold text-[var(--ink)] mb-4">找不到相關文章</p>
+          <p>很抱歉，沒有找到與 "{query}" 相關的文章，請嘗試使用其他關鍵字。</p>
+        </div>
+      ) : (
+        <div class="flex flex-col gap-6 max-w-4xl mx-auto">
+          <p class="text-[var(--ink-soft)] text-sm mb-4">共找到 {filteredPosts.length} 篇文章</p>
+          {filteredPosts.map((post) => (
+            <HorizontalCard client:load post={post} authorsMap={authorsMap} />
+          ))}
+        </div>
+      )
+    }
+  </div>
+</Base>

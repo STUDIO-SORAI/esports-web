@@ -1,0 +1,233 @@
+---
+import Base from '../../layouts/Base.astro'
+import {
+  fetchBrief,
+  fetchBriefs,
+  fetchPosts,
+  fetchAuthors,
+  formatDateTime,
+  hasTourRosterTag,
+} from '../../lib/api'
+import { ArrowLeftIcon } from '../../components/Icons'
+import { CompactCard } from '../../components/Cards'
+import { BriefBody } from '../../components/BriefBody'
+import { ShareBlock } from '../../components/ShareBlock'
+import { CATEGORY_FALLBACK, categoryPath, topicPath } from '../../lib/config'
+import { briefBodyToText } from '../../lib/briefBody'
+import {
+  absoluteUrl,
+  breadcrumbJsonLd,
+  newsArticleJsonLd,
+  siteOrigin,
+  toPlainShareTitle,
+} from '../../lib/seo'
+
+const { slug } = Astro.params
+const origin = siteOrigin(Astro.request, Astro.url)
+const shareUrl = `${origin}/brief/${slug}`
+const brief = await fetchBrief(slug!)
+
+if (!brief) {
+  Astro.response.status = 404
+  return Astro.rewrite('/404')
+}
+
+const displayTitle = toPlainShareTitle(brief.title)
+// 短文裡單獨成行的網址會被渲染成嵌入，摘要類欄位只取得出文字的部分
+const briefSummary = briefBodyToText(brief.body)
+const authors = await fetchAuthors(brief.authorIds)
+const authorLabel =
+  authors.length > 0 ? authors.map((a) => a.name).join('、') : brief.authorNames.join('、')
+
+const allPosts = await fetchPosts().catch(() => [])
+const relatedPosts = allPosts
+  .filter((p) => !hasTourRosterTag(p) && (p.categorySlug === brief.categorySlug || p.category === brief.category))
+  .slice(0, 4)
+
+if (relatedPosts.length < 4) {
+  const extra = allPosts
+    .filter(
+      (p) =>
+        !hasTourRosterTag(p) &&
+        !relatedPosts.some((r) => r.slug === p.slug)
+    )
+    .slice(0, 4 - relatedPosts.length)
+  relatedPosts.push(...extra)
+}
+
+const relatedBriefs = (await fetchBriefs(8).catch(() => [])).filter((b) => b.slug !== brief.slug).slice(0, 3)
+
+const DEFAULT_IMAGE =
+  'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9IiNlY2VjZWMiLz48L3N2Zz4='
+
+const getCategoryLogo = (cat: string) => {
+  if (cat === '特戰英豪') return '/valorantct.png'
+  if (cat === '英雄聯盟') return '/lolesports.png'
+  if (cat === '虹彩六號') return '/rainbow6.png'
+  if (cat === 'CS2') return '/cs2v2.webp'
+  return null
+}
+
+const pageImage = brief.image || '/og-image.png'
+const articleJsonLd = [
+  newsArticleJsonLd({
+    origin,
+    post: {
+      id: brief.id,
+      slug: brief.slug,
+      title: brief.title,
+      description: briefSummary,
+      category: brief.category,
+      publishedAt: brief.publishedAt,
+      updatedAt: brief.updatedAt,
+    },
+    authors: authors.length > 0 ? authors : brief.authorNames.map((name, i) => ({ id: brief.authorIds[i] || String(i), name })),
+    url: shareUrl,
+    image: absoluteUrl(origin, pageImage),
+  }),
+  breadcrumbJsonLd(origin, [
+    { name: '首頁', path: '/' },
+    { name: '戰報快訊', path: '/feed' },
+    ...(brief.category && brief.categorySlug
+      ? [{ name: brief.category, path: categoryPath(brief.categorySlug) }]
+      : []),
+    { name: displayTitle, path: `/brief/${slug}` },
+  ]),
+]
+---
+
+<Base
+  title={brief.title}
+  description={briefSummary || displayTitle}
+  image={pageImage}
+  type="article"
+  canonical={shareUrl}
+  publishedTime={brief.publishedAt}
+  modifiedTime={brief.updatedAt || brief.publishedAt}
+  jsonLd={articleJsonLd}
+>
+  <article class="min-h-screen bg-[var(--bg)] dark:bg-[#111] text-[var(--ink)] dark:text-gray-100 pb-20 font-sans">
+    <div class="w-full max-w-3xl mx-auto px-4 pt-8 xl:pt-12 flex flex-col">
+      <a
+        href="/feed"
+        class="flex items-center justify-center gap-2 text-[var(--ink-soft)] dark:text-gray-400 hover:text-[var(--ink)] dark:hover:text-white px-4 py-3 text-sm font-bold transition-[color,background-color] border border-[var(--line)] dark:border-gray-800 hover:bg-[var(--surface)] dark:hover:bg-gray-800 w-full mb-8"
+      >
+        <ArrowLeftIcon client:load size={16} /> 返回戰報快訊
+      </a>
+
+      <div class="flex flex-wrap items-center justify-center gap-2 mb-4">
+        {
+          brief.category && brief.categorySlug && (
+            <a
+              href={categoryPath(brief.categorySlug)}
+              class="inline-flex items-center gap-1.5 px-3 py-1 bg-red-500/10 dark:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-bold tracking-wider uppercase rounded-full border border-red-500/30 hover:bg-red-500 hover:text-white transition-colors"
+            >
+              {getCategoryLogo(brief.category) ? (
+                <img
+                  src={getCategoryLogo(brief.category)!}
+                  class="h-3.5 w-auto object-contain brightness-0 dark:invert opacity-90"
+                  alt={brief.category}
+                />
+              ) : null}
+              <span>{brief.category}</span>
+            </a>
+          )
+        }
+      </div>
+
+      <div class="flex flex-wrap items-center justify-center gap-2 text-[var(--ink-soft)] dark:text-gray-400 text-sm mb-5">
+        <span>{formatDateTime(brief.publishedAt || brief.updatedAt)}</span>
+        {
+          authorLabel && (
+            <>
+              <span class="mx-1">•</span>
+              <span>By {authorLabel}</span>
+            </>
+          )
+        }
+      </div>
+
+      <h1
+        class="text-3xl sm:text-4xl md:text-5xl font-bold leading-[1.1] text-[var(--ink)] dark:text-white uppercase text-center mb-8 tracking-tight font-en"
+      >
+        {displayTitle}
+      </h1>
+
+      <div class="mb-8 w-fit max-w-full mx-auto">
+        <img
+          src={brief.image || DEFAULT_IMAGE}
+          alt={displayTitle}
+          width={brief.imageWidth || undefined}
+          height={brief.imageHeight || undefined}
+          style={
+            brief.imageWidth && brief.imageHeight
+              ? `aspect-ratio:${brief.imageWidth}/${brief.imageHeight}`
+              : undefined
+          }
+          class="max-h-[70vh] max-w-full w-auto h-auto object-contain"
+        />
+      </div>
+
+      <BriefBody client:load body={brief.body} />
+
+      <div class="mt-4 flex justify-center border-t border-[var(--line)] dark:border-gray-800 pt-8 mb-8">
+        <ShareBlock client:load title={displayTitle} url={shareUrl} />
+      </div>
+
+      {
+        brief.tags.length > 0 && (
+          <div class="pt-4 border-t border-[var(--line)] dark:border-gray-800 flex flex-wrap gap-3 items-center mb-12">
+            <span class="text-[var(--ink-soft)] dark:text-gray-500 font-bold mr-2">話題標籤：</span>
+            {brief.tags.map((tag) => (
+              <a
+                href={topicPath(tag, CATEGORY_FALLBACK)}
+                class="bg-transparent border border-[var(--line)] dark:border-gray-700 px-4 py-1.5 rounded-full text-xs font-medium text-[var(--ink-soft)] dark:text-gray-400 hover:border-red-500 hover:text-red-500 dark:hover:border-red-400 dark:hover:text-red-400 transition-colors no-underline"
+              >
+                #{tag}
+              </a>
+            ))}
+          </div>
+        )
+      }
+
+      {
+        relatedPosts.length > 0 && (
+          <div class="mt-8">
+            <h2 class="font-serif text-xl font-bold mb-4 border-b border-[var(--line)] dark:border-gray-700 pb-2 inline-block">
+              延伸閱讀
+            </h2>
+            <div class="flex flex-col gap-2">
+              {relatedPosts.map((p) => (
+                <CompactCard client:load post={{ ...p, title: toPlainShareTitle(p.title) }} />
+              ))}
+            </div>
+          </div>
+        )
+      }
+
+      {
+        relatedBriefs.length > 0 && (
+          <div class="mt-12">
+            <h2 class="font-serif text-xl font-bold mb-4 border-b border-[var(--line)] dark:border-gray-700 pb-2 inline-block">
+              其他戰報
+            </h2>
+            <ul class="flex flex-col gap-3">
+              {relatedBriefs.map((b) => (
+                <li>
+                  <a href={`/brief/${b.slug}`} class="group flex gap-3 items-center">
+                    <div class="w-24 aspect-video shrink-0 overflow-hidden rounded bg-zinc-900">
+                      <img src={b.image || DEFAULT_IMAGE} alt="" class="w-full h-full object-cover" />
+                    </div>
+                    <span class="text-sm font-bold text-[var(--ink)] dark:text-white group-hover:text-red-400 transition-colors line-clamp-2">
+                      {toPlainShareTitle(b.title)}
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
+      }
+    </div>
+  </article>
+</Base>

@@ -1,0 +1,152 @@
+---
+import Base from '../../layouts/Base.astro'
+import {
+  fetchPosts,
+  fetchCategories,
+  formatDate,
+  getReadTime,
+} from '../../lib/api'
+import { CATEGORY_FALLBACK, categoryPath } from '../../lib/config'
+import { breadcrumbJsonLd, siteOrigin, toPlainShareTitle } from '../../lib/seo'
+
+const { category } = Astro.params
+const requestedSlug = decodeURIComponent(category || '').trim().toLowerCase()
+
+const [allPosts, categories] = await Promise.all([
+  fetchPosts(),
+  fetchCategories().catch(() => []),
+])
+
+const knownCategories = categories.length > 0 ? categories : CATEGORY_FALLBACK
+const matchedCategory = knownCategories.find((c) => c.slug === requestedSlug)
+
+// 分類頁只認英文代稱。舊的中文網址（/category/特戰英豪）一律 404。
+if (!matchedCategory) {
+  return new Response(null, { status: 404, statusText: 'Not Found' })
+}
+
+const decodedCategory = matchedCategory.name
+const categorySlug = matchedCategory.slug
+
+// 文章的分類是 CMS relationship，優先用 slug 比對；舊資料沒有 slug 時退回名稱。
+const posts = allPosts
+  .filter((p) =>
+    p.categorySlug
+      ? p.categorySlug === categorySlug
+      : (p.category || '').trim().toLowerCase() === decodedCategory.trim().toLowerCase()
+  )
+  .sort((a, b) => {
+    const da = new Date(a.publishedAt || a.updatedAt || 0).getTime()
+    const db = new Date(b.publishedAt || b.updatedAt || 0).getTime()
+    return db - da
+  })
+
+const getCategoryLogo = (slug: string) => {
+  const logos: Record<string, string> = {
+    valorant: '/valorantct.png',
+    lol: '/lolesports.png',
+    r6: '/rainbow6.png',
+    cs2: '/cs2v2.webp',
+  }
+  return logos[slug] || null
+}
+const catLogo = getCategoryLogo(categorySlug)
+const origin = siteOrigin(Astro.request, Astro.url)
+const categoryJsonLd = breadcrumbJsonLd(origin, [
+  { name: '首頁', path: '/' },
+  { name: decodedCategory, path: categoryPath(categorySlug) },
+])
+---
+
+<Base
+  title={`${decodedCategory} 專題新聞`}
+  description={`探索 ${decodedCategory} 的最新電競賽事報導、戰隊選手專訪與產業焦點。`}
+  noindex={posts.length === 0}
+  jsonLd={categoryJsonLd}
+>
+  <div class="max-w-[1240px] mx-auto px-4 sm:px-6 w-full pt-8 pb-20">
+    <!-- Category Header -->
+    <div class="mb-10 pb-6 border-b border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+      <div class="flex items-center gap-4">
+        {catLogo && (
+          <img
+            src={catLogo}
+            alt={decodedCategory}
+            class="h-10 sm:h-12 w-auto object-contain brightness-0 dark:invert"
+          />
+        )}
+        <div>
+          <div class="flex items-center gap-2 text-xs text-red-500 font-bold uppercase tracking-widest mb-1">
+            <span>CATEGORY</span>
+            <span>•</span>
+            <span>賽事專欄</span>
+          </div>
+          <h1 class="font-serif text-3xl sm:text-4xl font-black text-zinc-900 dark:text-white">
+            {decodedCategory}
+          </h1>
+        </div>
+      </div>
+      <span class="text-xs text-zinc-500 font-medium">共 {posts.length} 篇報導</span>
+    </div>
+
+    <!-- Posts Grid -->
+    {
+      posts.length === 0 ? (
+        <div class="p-16 text-center rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/40">
+          <p class="text-zinc-500 dark:text-zinc-400 text-sm mb-4">目前此分類下暫無相關文章。</p>
+          <a
+            href="/"
+            class="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-xs transition-colors"
+          >
+            返回首頁 &rarr;
+          </a>
+        </div>
+      ) : (
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {posts.map((post) => (
+            <a
+              href={`/post/${post.slug}`}
+              class="group flex flex-col bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl hover:border-zinc-300 dark:hover:border-zinc-700 transition-[box-shadow,border-color] duration-300"
+            >
+              <div class="w-full aspect-[16/9] overflow-hidden bg-zinc-900 relative">
+                {post.coverImage ? (
+                  <img
+                    src={post.coverImage}
+                    alt={toPlainShareTitle(post.title)}
+                    class="w-full h-full object-cover cover-zoom"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div class="w-full h-full flex items-center justify-center text-zinc-700 font-serif font-black text-xl">
+                    SORAI
+                  </div>
+                )}
+                {post.category && (
+                  <span class="absolute top-3 left-3 px-2.5 py-1 rounded-full text-[11px] font-bold bg-black/70 text-white backdrop-blur-md border border-white/10">
+                    {post.category}
+                  </span>
+                )}
+              </div>
+              <div class="p-5 flex flex-col flex-1 justify-between">
+                <div>
+                  <h3 class="font-bold text-base text-zinc-900 dark:text-white group-hover:text-red-500 dark:group-hover:text-red-400 transition-colors line-clamp-2 leading-snug">
+                    {toPlainShareTitle(post.title)}
+                  </h3>
+                  {post.description && (
+                    <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2 leading-relaxed">
+                      {post.description}
+                    </p>
+                  )}
+                </div>
+                <div class="mt-4 flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
+                  <span>{formatDate(post.publishedAt)}</span>
+                  <span>{getReadTime(post.content || '')}</span>
+                </div>
+              </div>
+            </a>
+          ))}
+        </div>
+      )
+    }
+  </div>
+</Base>

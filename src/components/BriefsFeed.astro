@@ -1,0 +1,179 @@
+---
+import type { Brief } from '../lib/types'
+import { formatFeedTime } from '../lib/api'
+import { categoryPath } from '../lib/config'
+import { toPlainShareTitle } from '../lib/seo'
+import { briefBodyToText } from '../lib/briefBody'
+
+interface Props {
+  briefs: Brief[]
+  heading?: string
+  showMore?: boolean
+  emptyText?: string
+  compactHeader?: boolean
+  dense?: boolean
+}
+
+const {
+  briefs,
+  heading = '戰報快訊',
+  showMore = false,
+  emptyText,
+  compactHeader = false,
+  dense = false,
+} = Astro.props
+---
+
+{
+  (briefs.length > 0 || emptyText) && (
+    <section class="flex flex-col" aria-labelledby="briefs-heading">
+      {
+        !compactHeader && (
+          <div class="flex items-center justify-between px-1 pb-3">
+            <h2
+              id="briefs-heading"
+              class="text-[15px] font-bold text-zinc-100 tracking-tight"
+            >
+              {heading}
+            </h2>
+            {
+              showMore && (
+                <a
+                  href="/feed"
+                  class="text-[13px] font-medium text-zinc-500 hover:text-red-400 transition-colors"
+                >
+                  看更多
+                </a>
+              )
+            }
+          </div>
+        )
+      }
+      {compactHeader && <h2 id="briefs-heading" class="sr-only">{heading}</h2>}
+
+      {
+        briefs.length === 0 && emptyText ? (
+          <p class="text-sm text-zinc-500 py-16 text-center">{emptyText}</p>
+        ) : (
+          <div class="flex flex-col divide-y divide-zinc-800">
+            {briefs.map((brief) => {
+              const title = toPlainShareTitle(brief.title)
+              const authorName = brief.authorNames[0] || 'SORAI'
+              const authorImage = brief.authorImages[0] || ''
+              const initial = authorName.charAt(0)
+              // 卡片預覽只放文字，短文裡的嵌入網址在列表上沒有意義
+              const summary = briefBodyToText(brief.body)
+              const body = summary && summary.trim() !== title.trim() ? summary : ''
+              return (
+                <article class={`flex gap-3 px-1 ${dense ? 'py-2.5' : 'py-4'}`}>
+                  {
+                    dense ? (
+                      <a href={'/brief/' + brief.slug} class="flex group items-center gap-3 w-full min-w-0">
+                        {
+                          brief.image && (
+                            <div class="w-16 aspect-video shrink-0 rounded overflow-hidden bg-zinc-900 border border-zinc-800">
+                              <img src={brief.image} alt="" class="w-full h-full object-cover" />
+                            </div>
+                          )
+                        }
+                        <div class="min-w-0 flex-1">
+                          <div class="flex items-baseline gap-1.5 text-[11px] text-zinc-500">
+                            <span class="truncate">{authorName}</span>
+                            <time datetime={brief.publishedAt} class="shrink-0">
+                              {formatFeedTime(brief.publishedAt || brief.updatedAt)}
+                            </time>
+                          </div>
+                          <h3 class="mt-0.5 text-[13px] font-semibold text-zinc-200 leading-snug line-clamp-2 group-hover:text-red-400 transition-colors">
+                            {title}
+                          </h3>
+                        </div>
+                      </a>
+                    ) : (
+                      <>
+                  <div class="shrink-0 pt-0.5">
+                    {
+                      authorImage ? (
+                        <img
+                          src={authorImage}
+                          alt=""
+                          class="w-10 h-10 rounded-full object-cover bg-zinc-800"
+                        />
+                      ) : (
+                        <div class="w-10 h-10 text-sm rounded-full bg-zinc-800 text-zinc-200 flex items-center justify-center font-bold">
+                          {initial}
+                        </div>
+                      )
+                    }
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-baseline gap-2 min-w-0">
+                      <span class="font-semibold text-[15px] text-zinc-100 truncate">
+                        {authorName}
+                      </span>
+                      <time
+                        datetime={brief.publishedAt}
+                        class="shrink-0 text-[13px] text-zinc-500"
+                      >
+                        {formatFeedTime(brief.publishedAt || brief.updatedAt)}
+                      </time>
+                      {
+                        brief.category && brief.categorySlug && (
+                          <a
+                            href={categoryPath(brief.categorySlug)}
+                            class="shrink-0 text-[12px] text-zinc-500 hover:text-red-400 transition-colors truncate"
+                          >
+                            {brief.category}
+                          </a>
+                        )
+                      }
+                    </div>
+                    <a href={'/brief/' + brief.slug} class="group block mt-1">
+                      <h3 class="text-[15px] font-semibold text-zinc-100 leading-snug group-hover:text-red-400 transition-colors">
+                        {title}
+                      </h3>
+                      {
+                        body && (
+                          <p class="mt-1 text-[15px] text-zinc-300 leading-relaxed whitespace-pre-wrap">
+                            {body}
+                          </p>
+                        )
+                      }
+                      {
+                        brief.image && (
+                          <div class="mt-3 rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-950 w-fit max-w-full">
+                            {/* 不裁切：照原比例縮到高度上限內。寬圖受 max-w-full 限於欄寬，
+                                直向圖被 max-h 收住。容器 w-fit 貼齊圖片，直向圖左右不會多出黑邊。
+
+                                aspect-ratio 一定要給：容器是 w-fit，圖沒載入前寬度會是 0，
+                                lazy 圖就永遠不會進視窗而卡在 0——先用已知比例把版位撐開。 */}
+                            <img
+                              src={brief.image}
+                              alt={title}
+                              width={brief.imageWidth || undefined}
+                              height={brief.imageHeight || undefined}
+                              loading="lazy"
+                              decoding="async"
+                              style={
+                                brief.imageWidth && brief.imageHeight
+                                  ? `aspect-ratio:${brief.imageWidth}/${brief.imageHeight}`
+                                  : undefined
+                              }
+                              class="max-h-[520px] max-w-full w-auto h-auto object-contain"
+                            />
+                          </div>
+                        )
+                      }
+                    </a>
+                  </div>
+                      </>
+                    )
+                  }
+                </article>
+              )
+            })}
+          </div>
+        )
+      }
+    </section>
+  )
+}

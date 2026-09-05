@@ -1,0 +1,494 @@
+---
+import Base from '../../layouts/Base.astro'
+import {
+  fetchPost,
+  fetchAuthors,
+  fetchPosts,
+  parseMaybeJsonArray,
+  formatDate,
+  getReadTime,
+  categoryFromPost,
+  hasTourRosterTag,
+  fetchNavCategories,
+} from '../../lib/api'
+import { MarkdownContent } from '../../components/MarkdownContent'
+import {
+  ArrowLeftIcon,
+  TwitterIcon,
+  InstagramIcon,
+  ThreadsIcon,
+  TwitchIcon,
+  YoutubeIcon,
+  WebsiteIcon,
+  MailIcon,
+} from '../../components/Icons'
+import { CompactCard } from '../../components/Cards'
+import { ShareBlock } from '../../components/ShareBlock'
+import { GoogleSwg } from '../../components/GoogleSwg'
+import { LivePreviewListener } from '../../components/LivePreviewListener'
+import { GoogleSourceSlugCard } from '../../components/GoogleSourceSlugCard'
+import { GradientButton } from '../../components/ui/gradient-button'
+import { GOOGLE_SOURCE_URL } from '../../components/GoogleSourceBanner'
+import { CATEGORY_FALLBACK, DEFAULT_OG_IMAGE, categoryPath, topicPath } from '../../lib/config'
+import {
+  absoluteUrl,
+  breadcrumbJsonLd,
+  newsArticleJsonLd,
+  siteOrigin,
+  toPlainShareTitle,
+} from '../../lib/seo'
+
+const { slug } = Astro.params
+const isPreview = Astro.url.searchParams.get('preview') === 'true'
+const origin = siteOrigin(Astro.request, Astro.url)
+const shareUrl = `${origin}/post/${slug}`
+let post = await fetchPost(slug!, isPreview)
+
+if (!post && !isPreview) {
+  Astro.response.status = 404
+  return Astro.rewrite('/404')
+}
+
+if (!post && isPreview) {
+  post = {
+    id: 'preview',
+    slug: slug || 'preview',
+    title: '即時預覽中...',
+    description: '',
+    content: '',
+    body: '',
+    rawContent: '',
+    coverImage: '',
+    ogImage: '',
+    category: '',
+    tags: [],
+    authors: JSON.stringify([]),
+    publishedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    wordCount: 0,
+    status: 'draft',
+  }
+}
+
+// Fetch Authors
+const authorIds = parseMaybeJsonArray(post.authors)
+const authors = await fetchAuthors(authorIds)
+
+// Fetch Related Posts
+const allPosts = await fetchPosts()
+const category = categoryFromPost(post)
+const cmsNavCategories = await fetchNavCategories().catch(() => [])
+const navCategories =
+  cmsNavCategories.length > 0
+    ? cmsNavCategories.map(({ name, slug }) => ({ name, slug }))
+    : [...CATEGORY_FALLBACK]
+// 文章自帶的 categorySlug 最準；沒有就用名稱回查。
+const postCategorySlug =
+  post.categorySlug ||
+  navCategories.find((c) => c.name.trim().toLowerCase() === category.trim().toLowerCase())?.slug ||
+  ''
+const relatedPosts = allPosts
+  .filter(
+    (p) =>
+      p.slug !== post.slug &&
+      !hasTourRosterTag(p) &&
+      parseMaybeJsonArray(p.tags).includes(category)
+  )
+  .slice(0, 4)
+
+if (relatedPosts.length < 4) {
+  const extra = allPosts
+    .filter(
+      (p) =>
+        p.slug !== post.slug &&
+        !hasTourRosterTag(p) &&
+        !parseMaybeJsonArray(p.tags).includes(category)
+    )
+    .slice(0, 4 - relatedPosts.length)
+  relatedPosts.push(...extra)
+}
+
+const displayTitle = toPlainShareTitle(post.title)
+const relatedPostsDisplay = relatedPosts.map((p) => ({
+  ...p,
+  title: toPlainShareTitle(p.title),
+}))
+
+const content = post.rawContent || post.body || post.content || ''
+const DEFAULT_IMAGE =
+  'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9IiNlY2VjZWMiLz48bGluZSB4MT0iMCIgeTE9IjAiIHgyPSIxMDAlIiB5Mj0iMTAwJSIgc3Ryb2tlPSIjZGFkYWRhIiBzdHJva2Utd2lkdGg9IisyIi8+PGxpbmUgeDE9IjEwMCUiIHkxPSIwIiB4Mj0iMCIgeTI9IjEwMCUiIHN0cm9rZT0iI2RhZGFkYSIgc3Ryb2tlLXdpZHRoPSIyIi8+PC9zdmc+'
+
+const getCategoryLogo = (cat: string) => {
+  if (cat === '特戰英豪') return '/valorantct.png'
+  if (cat === '英雄聯盟') return '/lolesports.png'
+  if (cat === '虹彩六號') return '/rainbow6.png'
+  if (cat === 'CS2') return '/cs2v2.webp'
+  return null
+}
+
+const pageImage = post.ogImage || post.coverImage || DEFAULT_OG_IMAGE
+const articleJsonLd = isPreview
+  ? []
+  : [
+      newsArticleJsonLd({
+        origin,
+        post,
+        authors,
+        url: shareUrl,
+        image: absoluteUrl(origin, pageImage),
+      }),
+      breadcrumbJsonLd(origin, [
+        { name: '首頁', path: '/' },
+        ...(category
+          ? [{ name: category, path: categoryPath(postCategorySlug) }]
+          : []),
+        { name: displayTitle, path: `/post/${slug}` },
+      ]),
+    ]
+---
+
+<Base
+  title={post.title}
+  description={post.description}
+  image={pageImage}
+  type="article"
+  canonical={shareUrl}
+  noindex={isPreview}
+  publishedTime={post.publishedAt}
+  modifiedTime={post.updatedAt || post.publishedAt}
+  jsonLd={articleJsonLd}
+>
+  <article class="min-h-screen bg-[var(--bg)] dark:bg-[#111] text-[var(--ink)] dark:text-gray-100 pb-20 relative font-sans">
+    <!-- 3-Column Layout Wrapper: Left(13%) + Center(70%) + Right(13%) -->
+    <div class="w-full max-w-full overflow-hidden xl:overflow-visible flex flex-col xl:flex-row justify-between items-start pt-8 xl:pt-16 px-4 xl:px-[2%] gap-8 xl:gap-[2%]">
+      <!-- LEFT SIDEBAR: Author Info -->
+      <aside class="hidden xl:flex w-[13%] shrink-0 sticky top-24 h-[calc(100vh-8rem)] flex-col justify-between items-center overflow-hidden pb-4">
+        <div class="flex flex-col items-center w-full gap-8">
+          <h3 class="font-serif text-lg font-bold border-b border-[var(--line)] dark:border-gray-800 pb-2 uppercase text-[var(--ink)] dark:text-gray-300 w-full mb-2 text-center">
+            作者簡介
+          </h3>
+          <div class="flex flex-col items-center gap-8 w-full">
+            {
+              authors.map((author) => (
+                <div class="flex flex-col items-center gap-3 w-full">
+                  {author.image ? (
+                    <img
+                      src={author.image}
+                      alt={author.name}
+                      class="w-16 h-16 xl:w-20 xl:h-20 rounded-full object-cover shadow-sm bg-[var(--surface)] dark:bg-[#222] p-0.5 border border-[var(--line)] dark:border-gray-700 shrink-0"
+                    />
+                  ) : (
+                    <div class="w-16 h-16 xl:w-20 xl:h-20 rounded-full bg-[var(--line-strong)] dark:bg-gray-800 flex items-center justify-center text-[var(--ink)] dark:text-white font-bold text-xl shrink-0">
+                      {author.name.charAt(0)}
+                    </div>
+                  )}
+                  <div class="flex flex-col items-center w-full px-1">
+                    <span class="font-bold text-[var(--ink)] dark:text-white text-sm xl:text-base break-words text-center">
+                      {author.name}
+                    </span>
+                    {author.bio && (
+                      <span class="text-[var(--ink-soft)] dark:text-gray-400 text-xs leading-relaxed mt-2 break-words text-center whitespace-pre-wrap">
+                        {author.bio}
+                      </span>
+                    )}
+                    {
+                      (author.socials && Object.values(author.socials).some(Boolean)) || author.contactEmail ? (
+                        <div class="flex flex-wrap items-center justify-center gap-1.5 mt-3 pt-3 border-t border-[var(--line)] dark:border-gray-800 w-full">
+                          {author.socials?.twitter && (
+                            <a
+                              href={author.socials.twitter.startsWith('http') ? author.socials.twitter : `https://x.com/${author.socials.twitter}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="w-7 h-7 flex items-center justify-center shrink-0 rounded hover:bg-zinc-200/50 dark:hover:bg-zinc-800 transition-[background-color,opacity] opacity-70 hover:opacity-100"
+                              title="X (Twitter)"
+                              aria-label="X (Twitter)"
+                            >
+                              <img src="/socials/x.svg" alt="X" class="w-4 h-4 object-contain brightness-0 dark:invert" />
+                            </a>
+                          )}
+                          {author.socials?.threads && (
+                            <a
+                              href={author.socials.threads.startsWith('http') ? author.socials.threads : `https://threads.net/@${author.socials.threads}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="w-7 h-7 flex items-center justify-center shrink-0 rounded hover:bg-zinc-200/50 dark:hover:bg-zinc-800 transition-[background-color,opacity] opacity-70 hover:opacity-100"
+                              title="Threads"
+                              aria-label="Threads"
+                            >
+                              <img src="/socials/threads.png" alt="Threads" class="w-4 h-4 object-contain brightness-0 dark:invert" />
+                            </a>
+                          )}
+                          {author.socials?.instagram && (
+                            <a
+                              href={author.socials.instagram.startsWith('http') ? author.socials.instagram : `https://instagram.com/${author.socials.instagram}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="w-7 h-7 flex items-center justify-center shrink-0 rounded hover:bg-zinc-200/50 dark:hover:bg-zinc-800 transition-[background-color,opacity] opacity-70 hover:opacity-100"
+                              title="Instagram"
+                              aria-label="Instagram"
+                            >
+                              <img src="/socials/instagram.svg" alt="Instagram" class="w-4 h-4 object-contain brightness-0 dark:invert" />
+                            </a>
+                          )}
+                          {author.socials?.twitch && (
+                            <a
+                              href={author.socials.twitch.startsWith('http') ? author.socials.twitch : `https://twitch.tv/${author.socials.twitch}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="w-7 h-7 flex items-center justify-center shrink-0 rounded hover:bg-zinc-200/50 dark:hover:bg-zinc-800 transition-[background-color,opacity] opacity-70 hover:opacity-100"
+                              title="Twitch"
+                              aria-label="Twitch"
+                            >
+                              <img src="/socials/twitch.svg" alt="Twitch" class="w-4 h-4 object-contain brightness-0 dark:invert" />
+                            </a>
+                          )}
+                          {author.socials?.youtube && (
+                            <a
+                              href={author.socials.youtube.startsWith('http') ? author.socials.youtube : `https://youtube.com/${author.socials.youtube}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="w-7 h-7 flex items-center justify-center shrink-0 rounded hover:bg-zinc-200/50 dark:hover:bg-zinc-800 transition-[background-color,opacity] opacity-70 hover:opacity-100"
+                              title="YouTube"
+                              aria-label="YouTube"
+                            >
+                              <img src="/socials/youtube.svg" alt="YouTube" class="w-4 h-4 object-contain brightness-0 dark:invert" />
+                            </a>
+                          )}
+                          {author.socials?.website && (
+                            <a
+                              href={author.socials.website.startsWith('http') ? author.socials.website : `https://${author.socials.website}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="w-7 h-7 flex items-center justify-center shrink-0 rounded hover:bg-zinc-200/50 dark:hover:bg-zinc-800 transition-[background-color,opacity] opacity-70 hover:opacity-100"
+                              title="個人網站"
+                              aria-label="個人網站"
+                            >
+                              <img src="/socials/globe.svg" alt="Website" class="w-4 h-4 object-contain brightness-0 dark:invert" />
+                            </a>
+                          )}
+                          {author.contactEmail && (
+                            <a
+                              href={`mailto:${author.contactEmail}`}
+                              class="w-7 h-7 flex items-center justify-center shrink-0 rounded hover:bg-zinc-200/50 dark:hover:bg-zinc-800 transition-[background-color,opacity] opacity-70 hover:opacity-100"
+                              title={`聯絡作者 (${author.contactEmail})`}
+                              aria-label="聯絡作者"
+                            >
+                              <img src="/socials/mail.svg" alt="Email" class="w-4 h-4 object-contain brightness-0 dark:invert" />
+                            </a>
+                          )}
+                        </div>
+                      ) : null
+                    }
+                  </div>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+
+        {/* 固定最底：整塊 GoogleSourceSlugCard 模組（專屬 slug 頁面） */}
+        <div class="w-full mt-auto pt-6">
+          <GoogleSourceSlugCard client:load />
+        </div>
+      </aside>
+
+      <!-- CENTER MAIN CONTENT: Exactly 70% -->
+      <div class="w-full xl:w-[70%] max-w-full shrink-0 flex flex-col bg-[var(--bg)] dark:bg-[#111]">
+        <!-- Navigator -->
+        <div class="w-full mb-8">
+          <a
+            href="/"
+            class="flex items-center justify-center gap-2 text-[var(--ink-soft)] dark:text-gray-400 hover:text-[var(--ink)] dark:hover:text-white px-4 py-3 rounded-none text-sm font-bold transition-[color,background-color] border border-[var(--line)] dark:border-gray-800 hover:bg-[var(--surface)] dark:hover:bg-gray-800 w-full"
+          >
+            <ArrowLeftIcon client:load size={16} /> 返回首頁
+          </a>
+        </div>
+
+        <!-- Header -->
+        <div class="w-full flex flex-col px-4 xl:px-0">
+          <div class="flex flex-wrap items-center justify-center gap-2 mb-4">
+            {
+              category && postCategorySlug && (
+                <a
+                  href={categoryPath(postCategorySlug)}
+                  class="inline-flex items-center gap-1.5 px-3 py-1 bg-red-500/10 dark:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-bold tracking-wider uppercase rounded-full border border-red-500/30 hover:bg-red-500 hover:text-white transition-colors"
+                >
+                  {getCategoryLogo(category) ? (
+                    <img
+                      src={getCategoryLogo(category)!}
+                      class="h-3.5 w-auto object-contain brightness-0 dark:invert opacity-90"
+                      alt={category}
+                    />
+                  ) : null}
+                  <span>{category}</span>
+                </a>
+              )
+            }
+          </div>
+
+          <div class="flex flex-wrap items-center justify-center gap-2 text-[var(--ink-soft)] dark:text-gray-400 text-sm mb-5">
+            <span>{formatDate(post.publishedAt || post.updatedAt).replace(/-/g, '.')}</span>
+            <span class="mx-1">•</span>
+            <span>{getReadTime(post)}</span>
+            {
+              authors.length > 0 && (
+                <>
+                  <span class="mx-1">•</span>
+                  <span>By {authors.map((a) => a.name).join(', ')}</span>
+                </>
+              )
+            }
+          </div>
+
+          <h1
+            id="post-title"
+            class="text-3xl sm:text-5xl md:text-[3.5rem] lg:text-[4rem] font-bold leading-[1] text-[var(--ink)] dark:text-white uppercase text-center mb-6 tracking-tight font-en"
+          >
+            {displayTitle}
+          </h1>
+
+          {
+            post.description ? (
+              <p id="post-description" class="text-sm md:text-lg text-[var(--ink-soft)] dark:text-gray-400 leading-relaxed text-center max-w-4xl mx-auto mb-8 font-medium">
+                {post.description}
+              </p>
+            ) : (
+              <p id="post-description" class="text-sm md:text-lg text-[var(--ink-soft)] dark:text-gray-400 leading-relaxed text-center max-w-4xl mx-auto mb-8 font-medium" style="display: none;">
+              </p>
+            )
+          }
+        </div>
+
+        <!-- Hero Image area -->
+        <div class="w-full relative mt-0">
+          <div class="relative w-full">
+            <img
+              id="post-hero-image"
+              src={post.coverImage || DEFAULT_IMAGE}
+              alt={displayTitle}
+              class="w-full h-auto max-h-[80vh] object-cover"
+            />
+          </div>
+        </div>
+
+        <!-- Mobile-only GoogleSourceSlugCard module under cover image -->
+        <div class="w-full px-4 mt-6 xl:hidden">
+          <GoogleSourceSlugCard client:load />
+        </div>
+
+        <!-- Article Body -->
+        <div class="w-full px-4 xl:px-8 mt-8 xl:mt-12">
+          <div class="prose-container mx-auto text-[var(--ink)] dark:text-gray-200" id="post-content">
+            <MarkdownContent client:load content={content} isPreview={isPreview} />
+          </div>
+
+          {isPreview && <LivePreviewListener client:load />}
+
+          <!-- Share Button：正文滑完的 SWG 觸發點 -->
+          <div id="post-end" class="mt-12 flex justify-center border-t border-[var(--line)] dark:border-gray-800 pt-8 mb-8">
+            <ShareBlock client:load title={displayTitle} url={shareUrl} />
+          </div>
+          <GoogleSwg client:load targetSelector="#post-end" />
+
+          <!-- Footer Topic Tags -->
+          {
+            parseMaybeJsonArray(post.tags).length > 0 && (
+              <div class="mt-16 pt-8 border-t border-[var(--line)] dark:border-gray-800 flex flex-wrap gap-3 items-center">
+                <span class="text-[var(--ink-soft)] dark:text-gray-500 font-bold mr-2">
+                  話題標籤：
+                </span>
+                {parseMaybeJsonArray(post.tags).map((tag) => (
+                  <a
+                    href={topicPath(tag, navCategories)}
+                    class="bg-transparent border border-[var(--line)] dark:border-gray-700 px-4 py-1.5 rounded-full text-xs font-medium text-[var(--ink-soft)] dark:text-gray-400 hover:border-red-500 hover:text-red-500 dark:hover:border-red-400 dark:hover:text-red-400 transition-colors no-underline"
+                  >
+                    #{tag}
+                  </a>
+                ))}
+              </div>
+            )
+          }
+        </div>
+      </div>
+
+      <!-- RIGHT SIDEBAR: Related Posts -->
+      <aside class="hidden xl:flex w-[13%] shrink-0 sticky top-24 flex-col items-center gap-6 overflow-hidden">
+        <h3 class="font-serif text-lg font-bold border-b border-[var(--line)] dark:border-gray-800 pb-2 uppercase text-[var(--ink)] dark:text-gray-300 w-full mb-2 text-center">
+          延伸閱讀
+        </h3>
+        <div class="flex flex-col gap-6 w-full">
+          {
+            relatedPostsDisplay.map((p) => (
+              <a href={`/post/${p.slug}`} class="group flex flex-col gap-3 w-full">
+                <div class="w-full aspect-video rounded overflow-hidden bg-[var(--surface-elevated)] dark:bg-gray-800 shrink-0">
+                  <img
+                    src={p.coverImage || DEFAULT_IMAGE}
+                    class="w-full h-full object-cover cover-zoom"
+                    alt={p.title}
+                  />
+                </div>
+                <div class="flex flex-col gap-1 w-full px-1">
+                  <h4 class="text-sm font-bold text-[var(--ink)] dark:text-white line-clamp-3 group-hover:text-[var(--ink-soft)] dark:group-hover:text-gray-300 transition-colors leading-snug">
+                    {p.title}
+                  </h4>
+                  <span class="text-[11px] text-[var(--ink-soft)] dark:text-gray-500">
+                    {formatDate(p.publishedAt || p.updatedAt).replace(/-/g, '.')}
+                  </span>
+                </div>
+              </a>
+            ))
+          }
+        </div>
+      </aside>
+
+      <!-- Mobile-only sidebars -->
+      <div class="w-full px-4 flex flex-col gap-12 mt-16 xl:hidden text-[var(--ink)] dark:text-gray-200">
+        {
+          authors.length > 0 && (
+            <div>
+              <h3 class="font-serif text-xl font-bold mb-4 border-b border-[var(--line)] dark:border-gray-700 pb-2 inline-block">
+                作者簡介
+              </h3>
+              <div class="flex flex-col gap-6">
+                {authors.map((author) => (
+                  <div class="flex flex-col gap-3 p-4 border border-[var(--line)] dark:border-gray-800 rounded bg-[var(--surface-elevated)] dark:bg-[#111]">
+                    <div class="flex items-center gap-4">
+                      {author.image ? (
+                        <img
+                          src={author.image}
+                          alt={author.name}
+                          class="w-12 h-12 rounded-full object-cover shrink-0 border border-[var(--line)] dark:border-gray-700"
+                        />
+                      ) : (
+                        <div class="w-12 h-12 rounded-full bg-[var(--line-strong)] dark:bg-gray-800 flex items-center justify-center text-[var(--ink)] dark:text-white font-bold shrink-0">
+                          {author.name.charAt(0)}
+                        </div>
+                      )}
+                      <span class="font-bold text-[var(--ink)] dark:text-white text-base">
+                        {author.name}
+                      </span>
+                    </div>
+                    {author.bio && (
+                      <span class="text-[var(--ink-soft)] dark:text-gray-400 text-sm leading-relaxed whitespace-pre-wrap">
+                        {author.bio}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        }
+
+        <div>
+          <h3 class="font-serif text-xl font-bold mb-4 border-b border-[var(--line)] dark:border-gray-700 pb-2 inline-block">
+            延伸閱讀
+          </h3>
+          <div class="flex flex-col gap-2">
+            {relatedPostsDisplay.map((p) => <CompactCard client:load post={p} />)}
+          </div>
+        </div>
+      </div>
+    </div>
+  </article>
+</Base>

@@ -1,0 +1,929 @@
+/* Hide scrollbar */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Marquee auto-scroll for mobile match bar */
+@keyframes marquee-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee-scroll 30s linear infinite;
+}
+
+@tailwind base;
+
+@layer base {
+  :root {
+    --font-serif: 'Noto Serif TC', serif;
+    --font-sans: 'Noto Sans TC', sans-serif;
+    /* English / display — Clash Display (Bold 700 is heaviest) */
+    --font-en: 'Clash Display', system-ui, sans-serif;
+  }
+
+/* English titles & UI: Clash Display (use font-bold = 700, heaviest cut) */
+.font-en {
+  font-family: var(--font-en), 'Clash Display', system-ui, sans-serif;
+  font-synthesis: none;
+}
+
+}
+
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background dark:bg-[#111] text-foreground antialiased;
+  }
+}
+
+/* Supreme Typography for Article Body */
+.markdown-body {
+  font-family: 'Noto Serif TC', var(--font-serif), serif !important;
+  font-size: 1.0625rem !important; /* ~17px */
+  line-height: 1.85 !important;
+  color: var(--heroui-default-900);
+  max-width: 768px;
+  margin: 0 auto;
+  letter-spacing: 0.03em;
+  text-align: justify;
+  text-justify: inter-ideograph;
+}
+
+/* Beautiful spacing */
+.markdown-body p {
+  margin-top: 1.8em;
+  margin-bottom: 1.8em;
+}
+
+.markdown-body .md-link {
+  color: var(--heroui-danger-500);
+  text-decoration: none !important;
+  background-color: transparent;
+  box-shadow: inset 0 -0.5em 0 0 rgba(239, 68, 68, 0.3);
+  /* 只列出 hover 真正會變的兩個屬性。原本是 transition: all —— 內文連結數量
+     可觀，而 all 的意思是「之後任何人加的樣式都自動變成過場」，包含會觸發
+     layout 的那些。 */
+  transition: box-shadow 0.2s ease-in-out, color 0.2s ease-in-out;
+  padding: 0 2px;
+  font-weight: 600;
+  border: none !important;
+  display: inline;
+  border-radius: 2px;
+}
+
+.markdown-body .md-link[href^="http"]::after {
+  content: "";
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  margin-left: 4px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ef4444' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6'%3E%3C/path%3E%3Cpolyline points='15 3 21 3 21 9'%3E%3C/polyline%3E%3Cline x1='10' y1='14' x2='21' y2='3'%3E%3C/line%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  vertical-align: text-bottom;
+}
+
+.markdown-body .md-link:hover {
+  box-shadow: inset 0 -1.2em 0 0 rgba(239, 68, 68, 0.4);
+  color: var(--heroui-danger-700);
+}
+
+.markdown-body s,
+.markdown-body del,
+.markdown-body .md-highlight {
+  text-decoration: none !important;
+  background-color: transparent;
+  box-shadow: inset 0 -0.5em 0 0 rgba(239, 68, 68, 0.4);
+  padding: 0 2px;
+  border-radius: 2px;
+  display: inline;
+}
+
+.markdown-body strong,
+.markdown-body b {
+  font-family: inherit !important;
+  font-weight: 700 !important;
+  color: inherit !important;
+}
+
+.markdown-body em,
+.markdown-body i {
+  font-family: inherit !important;
+  font-style: italic;
+  color: inherit !important;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  font-family: 'Noto Sans TC', var(--font-sans), sans-serif !important;
+  color: var(--heroui-foreground);
+  font-weight: 900 !important;
+  margin-top: 2.2em;
+  margin-bottom: 0.8em;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+}
+
+.markdown-body h2 {
+  font-size: 2.25rem !important;
+  border-bottom: 3px solid var(--heroui-default-200);
+  padding-bottom: 0.6rem;
+  margin-top: 2.5em;
+}
+
+.markdown-body h3 {
+  font-size: 1.75rem !important;
+}
+
+.markdown-body h4 {
+  font-size: 1.375rem !important;
+}
+
+/* Mobile: shrink in-article headings — desktop sizes unchanged */
+@media (max-width: 639px) {
+  .markdown-body h2 {
+    font-size: 1.375rem !important; /* 22px; was 2.25rem */
+    padding-bottom: 0.4rem;
+    margin-top: 1.75em;
+    margin-bottom: 0.65em;
+    line-height: 1.35;
+  }
+  .markdown-body h3 {
+    font-size: 1.25rem !important; /* 20px; was 1.75rem */
+    margin-top: 1.5em;
+    margin-bottom: 0.55em;
+  }
+  .markdown-body h4 {
+    font-size: 1.125rem !important; /* 18px */
+    margin-top: 1.35em;
+    margin-bottom: 0.5em;
+  }
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+  padding-left: 2rem;
+}
+
+.markdown-body li {
+  margin-top: 0.7em;
+  margin-bottom: 0.7em;
+}
+
+.markdown-body ul li {
+  list-style-type: square;
+  color: var(--heroui-default-700);
+}
+
+.markdown-body ol li {
+  list-style-type: decimal;
+  color: var(--heroui-default-700);
+}
+
+.markdown-body ul li::marker,
+.markdown-body ol li::marker {
+  color: var(--heroui-danger-500);
+  font-weight: bold;
+}
+
+.markdown-body blockquote {
+  position: relative;
+  font-family: inherit !important;
+  font-size: 1rem !important; 
+  font-weight: 400;
+  color: var(--heroui-default-600);
+  opacity: 0.9;
+  border-left: 5px solid var(--heroui-danger-500);
+  margin: 2.5em 0;
+  background: var(--heroui-content2);
+  padding: 1.5em 2em 1.5em 3.5em;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+}
+
+.markdown-body blockquote::before {
+  content: "\201C";
+  position: absolute;
+  top: 10px;
+  left: 15px;
+  font-size: 3.5rem;
+  font-family: Georgia, serif;
+  color: var(--heroui-danger-200);
+  line-height: 1;
+}
+
+.markdown-body blockquote p {
+  margin: 0 !important;
+}
+
+.markdown-body img,
+.markdown-body video,
+.markdown-body iframe {
+  max-width: 100%;
+  height: auto;
+  margin: 3em auto;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--heroui-default-100);
+}
+
+/* React Tweet Strict Override */
+html.dark .react-tweet-theme,
+html.light .react-tweet-theme,
+.dark .react-tweet-theme,
+.light .react-tweet-theme,
+[data-theme='dark'] .react-tweet-theme,
+[data-theme='light'] .react-tweet-theme,
+.react-tweet-theme,
+:where(.react-tweet-theme) {
+  --tweet-bg-color: transparent !important;
+  --tweet-bg-color-hover: rgba(255, 255, 255, 0.03) !important;
+  --tweet-border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  --tweet-font-color: #f4f4f5 !important;
+  --tweet-font-color-secondary: #a1a1aa !important;
+  --tweet-color-blue-primary: #ef4444 !important;
+  --tweet-color-blue-primary-hover: #dc2626 !important;
+  --tweet-skeleton-gradient: linear-gradient(270deg, #18181b, #27272a, #27272a, #18181b) !important;
+  background-color: transparent !important;
+  text-align: left !important;
+  text-justify: auto !important;
+  letter-spacing: normal !important;
+  word-spacing: normal !important;
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif !important;
+  margin: 0 auto !important;
+}
+
+/* Force all inner container elements of react-tweet to be transparent */
+.react-tweet-theme > div,
+.react-tweet-theme article,
+.react-tweet-theme [class*="tweet-container_root"],
+.react-tweet-theme [class*="tweet-container_article"],
+.react-tweet-theme [class*="quoted-tweet-container"] {
+  background-color: transparent !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.markdown-body .react-tweet-theme *,
+.react-tweet-theme * {
+  text-align: left !important;
+  text-justify: auto !important;
+  letter-spacing: normal !important;
+  word-spacing: normal !important;
+}
+
+.markdown-body .react-tweet-theme p,
+.react-tweet-theme p {
+  margin: 0.5em 0 !important;
+  line-height: 1.4 !important;
+}
+
+.markdown-body .react-tweet-theme img,
+.react-tweet-theme img {
+  max-width: revert !important;
+  height: revert !important;
+  max-height: 380px !important;
+  object-fit: cover !important;
+  object-position: top center !important;
+  margin: revert !important;
+  border-radius: revert !important;
+  box-shadow: revert !important;
+  border: revert !important;
+}
+
+.markdown-body pre {
+  background-color: #1a1b26 !important;
+  padding: 1.5em;
+  border-radius: 12px;
+  overflow-x: auto;
+  margin: 2em 0;
+  font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+  font-size: 0.9em;
+  line-height: 1.6;
+  border: 1px solid var(--heroui-default-200);
+}
+
+.markdown-body code {
+  background-color: var(--heroui-default-100);
+  color: var(--heroui-danger-500);
+  padding: 0.2em 0.5em;
+  border-radius: 6px;
+  font-size: 0.85em;
+  font-family: Consolas, monospace;
+}
+
+.markdown-body pre code {
+  background-color: transparent;
+  color: #e0af68;
+  padding: 0;
+}
+
+/* Markdown Tables */
+.markdown-body table {
+  width: 100%;
+  margin: 2em 0;
+  border-collapse: collapse;
+  overflow-x: auto;
+  display: table;
+  font-size: 0.9rem;
+  border: 1px solid var(--line, #333);
+}
+
+.markdown-body th,
+.markdown-body td {
+  padding: 10px 14px;
+  border: 1px solid var(--line, #333);
+  text-align: left;
+}
+
+.markdown-body th {
+  background: var(--surface, #1e1e1e);
+  font-weight: 700;
+  color: var(--ink, #fff);
+}
+
+.markdown-body tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* ── 內文圖片放大檢視（Lightbox） ────────────────────────────────
+   圖片本身變成按鈕了，所以邊框與版面要交還給裡面的 img —— 看得見的一切
+   仍然屬於那張圖。zoom-in 游標就是全部的提示：站上沒有別的東西用這個游標，
+   它不用配一行說明就講清楚點下去會發生什麼事。 */
+.markdown-body .media-zoom {
+  display: block;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  cursor: zoom-in;
+}
+
+.markdown-body .media-zoom img {
+  transition: opacity 0.2s ease;
+}
+
+.markdown-body .media-zoom:hover img {
+  opacity: 0.86;
+}
+
+.markdown-body .media-zoom:focus-visible {
+  outline: 2px solid #ef4444;
+  outline-offset: 3px;
+  border-radius: 12px;
+}
+
+/* 把圖片放到螢幕能給的最大尺寸，蓋在全站之上。跟對話框同一種遮罩：
+   這是 modal，圖片開著的時候底下的頁面碰不到。 */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1000000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 24px 24px;
+  background: rgba(9, 9, 11, 0.86);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  cursor: zoom-out;
+  animation: lightbox-in 0.2s ease;
+}
+
+/* transform 由 JS 寫入（滾輪在縮放它），所以這個元素只要答應不跟它打架：
+   不要 transition（滾輪本身已經是連續的，替每一格加緩動只會讓畫面落後游標一個
+   duration），touch-action 設 none 讓拖曳去平移圖片、而不是被當成頁面手勢。
+   放大後的圖片可以抓、游標也要說出來；滿版時沒有東西可拖，游標維持預設，
+   背景則保持 zoom-out。 */
+.lightbox-image {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  margin: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: none;
+  cursor: default;
+  transform-origin: center;
+  will-change: transform;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/*
+ * 拖曳與縮放期間把遮罩的模糊關掉。
+ *
+ * 上層圖片每動一次 transform，底下這塊滿版 backdrop-filter 就得整片重算 ——
+ * 這是全站唯一「連續互動期間還存在的大面積模糊」，也是這個檢視最貴的一筆。
+ *
+ * 拿掉幾乎看不出差別：遮罩本身已經是 86% 的黑，模糊本來就只透出一點點。
+ * 滿版狀態（沒有 data-zoomed）不會拖也不會縮，模糊留著沒有代價。
+ */
+.lightbox:has(.lightbox-image[data-zoomed]) {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.lightbox-image[data-zoomed] {
+  cursor: grab;
+}
+
+.lightbox-image[data-zoomed]:active {
+  cursor: grabbing;
+}
+
+/* 標籤寫出按鍵，因為鍵盤才是比較快的那條出路，順便教會它。
+   顏色直接寫死不走主題變數：遮罩在明暗兩個主題下都是深色的，
+   一個會在亮色主題翻成近黑的 token，會剛好在頁面變亮時把深色字放到深色底上。 */
+.lightbox-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 1;
+  /* 手機沒有 ESC 鍵，叉叉是唯一的關閉入口，所以要撐到好按的觸控尺寸 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  background: rgba(0, 0, 0, 0.45);
+  color: #e4e4e7;
+  cursor: pointer;
+  border-radius: 9999px;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.lightbox-close:hover {
+  color: #fafafa;
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.lightbox-close:focus-visible {
+  outline: 2px solid #ef4444;
+  outline-offset: 2px;
+}
+
+@keyframes lightbox-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+
+
+/*
+ * 全站鍵盤焦點樣式。用 :where() 讓專一度為 0，元件想自己畫焦點時
+ * 不需要 !important 就蓋得掉；:focus-visible 則確保滑鼠點擊不會冒出框。
+ */
+:where(a, button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid #ef4444;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* 跳至主要內容：平常收在畫面外，被 Tab 到才出現 */
+.skip-link {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -150%);
+  z-index: 100001;
+  padding: 10px 20px;
+  border-radius: 0 0 8px 8px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 700;
+  /* 不加 transition：skip link 只由 Tab 觸發，是純鍵盤動作。
+     鍵盤觸發的東西不該有動畫 —— 過場只會延遲使用者最需要看到它的那一刻。 */
+}
+
+.skip-link:focus-visible {
+  transform: translate(-50%, 0);
+  outline-offset: -4px;
+}
+
+/*
+ * 動效偏好。原本只有 .lightbox 的開場動畫尊重這個設定，其餘（搜尋浮層的
+ * 進場、卡片 hover 放大、漢堡動畫）都還是照跑。
+ * 不是設 0s：完全歸零會讓依賴 transitionend / animationend 的程式收不到事件。
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    /*
+     * 「更少更溫和」而不是「歸零」：把可過場的屬性限縮成不會產生位移的那些，
+     * 於是 transform / 位置變化直接跳到終點，顏色與淡入淡出仍然保留 ——
+     * 那些是幫助理解狀態變化的，拿掉反而更難懂。
+     */
+    transition-property: opacity, color, background-color, border-color, box-shadow,
+      fill, stroke !important;
+    transition-duration: 150ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* 圖片燈箱維持淡入，只是不要再有其他動作 */
+  .lightbox {
+    animation-duration: 150ms !important;
+  }
+
+  /*
+   * 封面放大純屬裝飾，沒有傳達任何狀態。上面的規則已經讓 transform 不再過場，
+   * 但那只是「瞬間跳到放大」——一樣是位移。這裡直接讓它不要放大。
+   */
+  .group:hover .cover-zoom {
+    transform: none !important;
+  }
+}
+
+/*
+ * 搜尋浮層的進出場。
+ *
+ * 原本掛的是 animate-in / zoom-in-95 / slide-in-from-top-2，但那些來自
+ * tailwindcss-animate，這個專案沒裝，所以完全沒有產生 CSS —— 浮層是硬跳出來的，
+ * 而 duration-* 則落到了 transition-duration 上，配上 transition-property 的
+ * 初始值 all，等於意外造出兩個 transition: all。
+ *
+ * 改用 @starting-style：純 CSS、可中斷，也不必為了動畫多裝一個相依套件。
+ * 不支援的瀏覽器就是直接出現，跟修好之前一樣，不會更糟。
+ */
+.search-backdrop {
+  opacity: 1;
+  transition: opacity 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@starting-style {
+  .search-backdrop {
+    opacity: 0;
+  }
+}
+
+.search-panel {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 160ms cubic-bezier(0.23, 1, 0.32, 1),
+    transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@starting-style {
+  .search-panel {
+    opacity: 0;
+    /* 不從 scale(0) 開始：沒有東西是從無到有出現的 */
+    transform: scale(0.96) translateY(-8px);
+  }
+}
+
+/* 關閉是「使用者已經決定了」，收得比開啟快 */
+.search-backdrop[data-closing],
+.search-panel[data-closing] {
+  opacity: 0;
+  transition-duration: 120ms;
+}
+
+.search-panel[data-closing] {
+  transform: scale(0.98) translateY(-4px);
+}
+
+/*
+ * 卡片封面的 hover 放大。
+ *
+ * 原本散在 17 個地方各寫各的：500ms、700ms、1500ms 都有，全都超過 UI 動效
+ * 300ms 的上限，而且沒有一個做 pointer 閘控——觸控裝置點一下會觸發假 hover，
+ * 圖片放大後卡在那裡不會縮回去。
+ *
+ * 300ms + ease-in-out。曲線比時長更關鍵：強 ease-out（0.23, 1, 0.32, 1）
+ * 會把動作全擠在前段，同曲線就算拉到 500ms，前 100ms 仍跑掉六成八，
+ * 開頭一樣是「彈一下」。封面放大是在畫面上變形而不是進場，用 ease-in-out
+ * 才會是平順推近的感覺。
+ *
+ * 時長是試出來的：200ms 太急、500ms 拖，最後落在 300ms —— 正好是 UI 動效的
+ * 上限，再往下就會開始回到「一瞬間就到位」。
+ *
+ * 放在 @media 裡是為了讓沒有精準指標的裝置完全拿不到這個效果。
+ */
+.cover-zoom {
+  transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .group:hover .cover-zoom {
+    transform: scale(1.05);
+  }
+}
+
+/*
+ * 對話框（搜尋浮層、圖片燈箱、投稿規範）開啟時會把 body 設成 overflow: hidden
+ * 鎖住背景捲動，捲軸因此消失，頁面可用寬度多出捲軸的寬度，整個版面就往旁邊
+ * 跳一下——實測是 15px。
+ *
+ * 永遠保留捲軸的空間，開關對話框時寬度就不會變。這比在每個對話框裡各自補
+ * padding-right 可靠：新加的對話框自動就是對的。
+ */
+html {
+  scrollbar-gutter: stable;
+}
+
+/* ─── rim light ─────────────────────────────────────────────────────────
+ * hover 時沿著邊框跑一圈高光，外加一層同色系的外暈。Google 來源按鈕與首頁
+ * 賽事資訊列共用這一份，差別只在 --rim-glow：前者 Google 藍，後者品牌紅。
+ *
+ * 高光本體是一圈 conic-gradient，用 mask 把中間挖掉只留 1px 邊。角度走
+ * @property，所以能用 keyframes 轉。
+ */
+@property --rim-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.rim-light {
+  position: relative;
+  --rim-angle: 0deg;
+  --rim-line: rgba(255, 255, 255, 0.7);
+  --rim-glow: rgba(66, 133, 244, 0.55);
+  /* 背光的擴散程度。原本 -8px 的 spread 把光收得緊貼邊緣，等於看不見；
+   * 放寬成兩層（近距離的實光 + 遠距離的散光）才讀得出是「從背後打出來」。 */
+  --rim-glow-near: 0 4px 16px -6px;
+  --rim-glow-far: 0 10px 42px -4px;
+  /* box-shadow 不會跨規則疊加，hover 時整條會被換掉。元素本來就有陰影的
+   * （例如賽事資訊列的 shadow-lg）要把它填進這裡，才不會一 hover 就變平。 */
+  --rim-base-shadow: 0 0 #0000;
+}
+
+.rim-light::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--rim-angle),
+    transparent 0%,
+    var(--rim-line) 10%,
+    transparent 24%,
+    transparent 100%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+
+.rim-light:hover::before,
+.rim-light:focus-visible::before {
+  opacity: 1;
+}
+
+.rim-light:hover::before {
+  animation: rim-light-sweep 2.4s linear infinite;
+}
+
+.rim-light:hover {
+  box-shadow:
+    var(--rim-base-shadow),
+    var(--rim-glow-near) var(--rim-glow),
+    var(--rim-glow-far) var(--rim-glow);
+}
+
+@keyframes rim-light-sweep {
+  to {
+    --rim-angle: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rim-light:hover::before {
+    animation: none;
+  }
+}
+
+/* ─── Google 品牌漸層按鈕 ────────────────────────────────────────────────
+ * 參考 21st.dev @serafimcloud/gradient-button（Aaron Iker 的實作）。
+ *
+ * 舊版把五個 radial-gradient 疊在一起，每層都帶大範圍 alpha 衰減，綠、黃、紅
+ * 在交界處互相透出來，就糊成分不出色相的一坨。這版改成單一 radial-gradient：
+ * 四個品牌色各自佔一段 color stop，畫出乾淨的同心弧帶，深色底獨佔左半邊，
+ * 文字永遠壓在純色上，對比不會隨漸層飄移。
+ *
+ * 位置、擴散、色停全部註冊成 @property，所以 hover 能真的補間，
+ * 不必再靠 filter: brightness() 硬把整顆按鈕打亮（那只會讓顏色更洗白）。
+ */
+
+@property --gb-pos-x {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 100%;
+}
+
+@property --gb-pos-y {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 0%;
+}
+
+@property --gb-spread-x {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 78%;
+}
+
+@property --gb-spread-y {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 255%;
+}
+
+@property --gb-stop-red {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 22%;
+}
+
+@property --gb-stop-yellow {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 37%;
+}
+
+@property --gb-stop-green {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 52%;
+}
+
+@property --gb-stop-blue {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 67%;
+}
+
+@property --gb-stop-navy {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 83%;
+}
+
+@property --gb-stop-base {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 108%;
+}
+
+.gradient-button {
+  /* Google 官方四色，不摻中間過渡色——#f29900 那種橘就是糊掉的來源 */
+  --gb-red: #ea4335;
+  --gb-yellow: #fbbc05;
+  --gb-green: #34a853;
+  --gb-blue: #4285f4;
+  /* Google 深藍：文案尾端會壓在這一段，白字對比 4.6:1 */
+  --gb-navy: #1a73e8;
+  --gb-base: #0b0a14;
+  /* 這顆按鈕寬度只有賽事資訊列的四分之一，沿用同一組背光數值會散得過頭，
+   * 所以近光與散光都收緊一階。 */
+  --rim-glow-near: 0 2px 10px -6px;
+  --rim-glow-far: 0 6px 20px -8px;
+
+  position: relative;
+  overflow: hidden;
+  border: none;
+  cursor: pointer;
+  background: radial-gradient(
+    var(--gb-spread-x) var(--gb-spread-y) at var(--gb-pos-x) var(--gb-pos-y),
+    var(--gb-red) var(--gb-stop-red),
+    var(--gb-yellow) var(--gb-stop-yellow),
+    var(--gb-green) var(--gb-stop-green),
+    var(--gb-blue) var(--gb-stop-blue),
+    var(--gb-navy) var(--gb-stop-navy),
+    var(--gb-base) var(--gb-stop-base)
+  );
+  /* 移開：0.6s 收回 */
+  transition:
+    --gb-pos-x 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    --gb-pos-y 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    --gb-spread-y 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    --gb-spread-x 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    --gb-stop-red 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    --gb-stop-yellow 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    --gb-stop-green 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    --gb-stop-blue 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    --gb-stop-navy 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    --gb-stop-base 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.4s ease,
+    box-shadow 0.4s ease;
+}
+
+.gradient-button:hover {
+  /* 弧帶往左推、整體攤開，四個色帶各自變寬而不是互相蓋掉 */
+  --gb-spread-x: 92%;
+  --gb-spread-y: 292%;
+  --gb-stop-red: 20%;
+  --gb-stop-yellow: 35%;
+  --gb-stop-green: 51%;
+  --gb-stop-blue: 67%;
+  --gb-stop-navy: 84%;
+  --gb-stop-base: 110%;
+  filter: saturate(1.12);
+  /* 移入：0.5s 伸展 */
+  transition:
+    --gb-pos-x 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    --gb-pos-y 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    --gb-spread-y 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    --gb-spread-x 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    --gb-stop-red 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    --gb-stop-yellow 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    --gb-stop-green 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    --gb-stop-blue 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    --gb-stop-navy 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    --gb-stop-base 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.gradient-button > * {
+  position: relative;
+  z-index: 10;
+  /* 文案偏長，尾端一定會壓到藍綠band。與其在漸層上再疊暗色遮罩（那就是舊版
+   * 糊掉的原因），不如給白字一層緊實陰影，顏色維持乾淨、對比也守得住。 */
+  text-shadow: 0 1px 3px rgba(3, 2, 8, 0.55);
+}
+
+/*
+ * variant：同一套弧帶，換更深的底，給淺色卡片用。
+ */
+.gradient-button-variant {
+  --gb-base: #020617;
+}
+
+/*
+ * popup：Banner 與文章頁 slug 卡片用的小尺寸按鈕（px-4 py-2.5 text-xs）。
+ * 按鈕一小，弧帶跟著等比縮，四個色就會擠在幾十個 px 裡糊掉——所以把整組
+ * 色停往右邊壓緊、擴散收窄，左邊留更大一塊純底給文字。
+ */
+.gradient-button-popup {
+  --gb-pos-x: 100%;
+  --gb-pos-y: 0%;
+  --gb-spread-x: 68%;
+  --gb-spread-y: 300%;
+  --gb-stop-red: 20%;
+  --gb-stop-yellow: 36%;
+  --gb-stop-green: 52%;
+  --gb-stop-blue: 68%;
+  --gb-stop-navy: 84%;
+  --gb-stop-base: 110%;
+}
+
+.gradient-button-popup:hover {
+  --gb-spread-x: 80%;
+  --gb-spread-y: 334%;
+  --gb-stop-red: 18%;
+  --gb-stop-yellow: 34%;
+  --gb-stop-green: 51%;
+  --gb-stop-blue: 68%;
+  --gb-stop-navy: 85%;
+  --gb-stop-base: 112%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gradient-button,
+  .gradient-button:hover {
+    transition: filter 0.2s ease, box-shadow 0.2s ease;
+  }
+}

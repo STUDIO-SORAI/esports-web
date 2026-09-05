@@ -1,0 +1,273 @@
+---
+import { SiteNavbar } from '../components/SiteNavbar'
+import { CookieConsent } from '../components/CookieConsent'
+import { GoogleSourceBanner } from '../components/GoogleSourceBanner'
+import { fetchPosts, fetchNavCategories } from '../lib/api'
+import { CATEGORY_FALLBACK } from '../lib/config'
+import {
+  SITE_NAME,
+  DEFAULT_DESCRIPTION,
+  absoluteUrl,
+  siteOrigin,
+  organizationJsonLd,
+  websiteJsonLd,
+  toPlainShareTitle,
+} from '../lib/seo'
+import '../app/globals.css'
+
+interface Props {
+  title?: string
+  description?: string
+  image?: string
+  type?: string
+  canonical?: string
+  noindex?: boolean
+  publishedTime?: string
+  modifiedTime?: string
+  jsonLd?: object | object[]
+}
+
+const {
+  title = SITE_NAME,
+  description = DEFAULT_DESCRIPTION,
+  image = '/og-image.png',
+  type = 'website',
+  canonical,
+  noindex = false,
+  publishedTime,
+  modifiedTime,
+  jsonLd,
+} = Astro.props
+
+const origin = siteOrigin(Astro.request, Astro.url)
+const canonicalUrl = canonical || `${origin}${Astro.url.pathname}`
+const absImage = absoluteUrl(origin, image)
+const posts = await fetchPosts().catch(() => [])
+const cmsCategories = await fetchNavCategories().catch(() => [])
+// CMS 掛掉時仍要有導覽列可用，不然整站看起來像壞了。
+const navItems = cmsCategories.length > 0
+  ? cmsCategories.map(({ name, slug }) => ({ name, slug }))
+  : [...CATEGORY_FALLBACK]
+
+const latestPostsByCategory: Record<
+  string,
+  { slug: string; title: string; coverImage?: string }[]
+> = {}
+
+for (const cat of navItems) {
+  const matching = posts.filter((p: any) => {
+    if (p.categorySlug) return p.categorySlug === cat.slug
+    const pCat = (p.category || '').trim().toLowerCase()
+    const targetCat = cat.name.trim().toLowerCase()
+    return pCat === targetCat
+  })
+  latestPostsByCategory[cat.name] = matching
+    .sort(
+      (a: any, b: any) =>
+        new Date(b.publishedAt || b.updatedAt || 0).getTime() -
+        new Date(a.publishedAt || a.updatedAt || 0).getTime()
+    )
+    .slice(0, 3)
+    .map((p: any) => ({
+      slug: p.slug,
+      title: p.title,
+      coverImage: p.coverImage,
+    }))
+}
+
+const displayTitle = toPlainShareTitle(title)
+const fullTitle =
+  !displayTitle || displayTitle === SITE_NAME
+    ? `${SITE_NAME}｜中文電競新聞、賽事資訊與產業分析`
+    : displayTitle.includes(SITE_NAME)
+      ? displayTitle
+      : `${SITE_NAME} - ${displayTitle}`
+const shareTitle =
+  type === 'article' && displayTitle && displayTitle !== SITE_NAME
+    ? displayTitle
+    : fullTitle
+const currentYear = new Date().getFullYear()
+const extraJsonLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : []
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@graph': [organizationJsonLd(origin), websiteJsonLd(origin), ...extraJsonLd],
+}
+---
+
+<!doctype html>
+<html lang="zh-Hant-TW" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script is:inline>
+      try {
+        const theme = localStorage.getItem('theme') || 'dark';
+        if (theme === 'dark') {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      } catch (e) {}
+    </script>
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    {noindex ? (
+      <meta name="robots" content="noindex, follow" />
+    ) : (
+      <meta name="robots" content="index, follow" />
+    )}
+    <link rel="canonical" href={canonicalUrl} />
+    <link rel="alternate" type="application/rss+xml" title={`${SITE_NAME} RSS Feed`} href="/rss.xml" />
+    <link rel="alternate" type="application/rss+xml" title={`${SITE_NAME} 戰報快訊`} href="/rss-briefs.xml" />
+
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png" />
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
+    <link rel="icon" type="image/png" sizes="256x256" href="/favicon-256x256.png" />
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" type="image/png" href="/_w.png" />
+
+    <meta property="og:site_name" content={SITE_NAME} />
+    <meta property="og:title" content={shareTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content={type} />
+    <meta property="og:locale" content="zh_TW" />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:image" content={absImage} />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={shareTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={absImage} />
+
+    {type === 'article' && publishedTime && (
+      <meta property="article:published_time" content={publishedTime} />
+    )}
+    {type === 'article' && modifiedTime && (
+      <meta property="article:modified_time" content={modifiedTime} />
+    )}
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&family=Noto+Serif+TC:wght@400;500;700;900&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://api.fontshare.com/v2/css?f[]=clash-display@200,300,400,500,600,700&display=swap"
+      rel="stylesheet"
+    />
+
+    <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
+
+    <!-- First-party pageview tracker (CMS dashboard). No third-party analytics. -->
+    <script is:inline>
+      (function () {
+        if (typeof window === 'undefined') return
+        try {
+          var sidKey = '_sorai_sid'
+          var sid = sessionStorage.getItem(sidKey)
+          if (!sid) {
+            sid = 's_' + Math.random().toString(36).slice(2, 11) + Date.now().toString(36)
+            sessionStorage.setItem(sidKey, sid)
+          }
+
+          var startTime = Date.now()
+          var url = '/api/analytics'
+
+          function sendHit(duration) {
+            var data = {
+              session: sid,
+              path: window.location.pathname || '/',
+              referrer: document.referrer || '',
+              title: document.title || '',
+              duration: duration || 0,
+            }
+            if (navigator.sendBeacon) {
+              navigator.sendBeacon(
+                url,
+                new Blob([JSON.stringify(data)], { type: 'application/json' })
+              )
+            } else {
+              fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+                keepalive: true,
+              }).catch(function () {})
+            }
+          }
+
+          sendHit(0)
+
+          window.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'hidden') {
+              var dur = Math.round((Date.now() - startTime) / 1000)
+              if (dur > 0 && dur < 1800) {
+                sendHit(dur)
+              }
+            }
+          })
+        } catch (e) {}
+      })()
+    </script>
+  </head>
+  <body class="min-h-screen bg-background dark:bg-[#111] text-foreground font-sans antialiased text-default-900 selection:bg-danger/30">
+    <div class="w-full min-h-screen flex flex-col">
+      <a class="skip-link" href="#main-content">跳至主要內容</a>
+      <SiteNavbar client:load navItems={navItems} latestPostsByCategory={latestPostsByCategory} />
+      <main id="main-content" tabindex="-1" class="pb-24 pt-28 flex-1">
+        <slot />
+      </main>
+
+      <footer class="w-full border-t border-divider bg-background dark:bg-[#111] pt-16 pb-12 relative overflow-hidden flex-shrink-0 mt-auto">
+        <div class="max-w-[1240px] mx-auto px-6 w-full flex flex-col md:flex-row items-center md:items-end justify-between gap-10 relative z-10">
+          <div class="flex flex-col items-center md:items-start text-center md:text-left">
+            <div class="mb-4 md:mb-2">
+              <img
+                src="/logotype-og_w.png"
+                alt="SORAI ESPORTS"
+                class="h-7 md:h-8 w-auto invert dark:invert-0 opacity-90"
+              />
+            </div>
+            <p class="text-default-500 max-w-sm text-sm font-medium leading-relaxed mt-2 md:mt-0">
+              提供最新、最深度的中文圈電競新聞，
+              <br class="hidden md:block" />
+              涵蓋賽事第一手資訊、戰隊動態與產業深度觀點。
+            </p>
+          </div>
+
+          <div class="flex flex-col items-center md:items-end justify-end text-center md:text-right gap-4">
+            <nav class="flex flex-wrap items-center justify-center md:justify-end gap-x-4 gap-y-2 text-xs font-semibold text-default-500">
+              <a href="/matches" class="hover:text-red-500 dark:hover:text-red-400 transition-colors">賽事資訊</a>
+              <a href="/about" class="hover:text-red-500 dark:hover:text-red-400 transition-colors">關於我們</a>
+              <a href="/contact" class="hover:text-red-500 dark:hover:text-red-400 transition-colors">聯絡我們</a>
+              <a href="/privacy" class="hover:text-red-500 dark:hover:text-red-400 transition-colors">隱私權政策</a>
+              <a href="/disclaimer" class="hover:text-red-500 dark:hover:text-red-400 transition-colors">內容聲明</a>
+            </nav>
+            <p class="font-sans text-[11px] md:text-xs text-default-400 font-medium tracking-widest uppercase">
+              &copy; {currentYear} SORAI ESPORTS.
+              <br class="block md:hidden" /> ALL RIGHTS RESERVED.
+            </p>
+          </div>
+        </div>
+      </footer>
+    </div>
+    <CookieConsent client:load />
+    <GoogleSourceBanner client:load />
+
+    <script is:inline>
+      document.addEventListener('click', (e) => {
+        const btn = e.target && e.target.closest ? e.target.closest('#theme-toggle-btn') : null;
+        if (btn) {
+          const isDark = document.documentElement.classList.toggle('dark');
+          try {
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+          } catch (err) {}
+        }
+      });
+    </script>
+  </body>
+</html>
