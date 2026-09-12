@@ -1,0 +1,275 @@
+---
+import Base from '../../layouts/Base.astro'
+import {
+  fetchPosts,
+  parseMaybeJsonArray,
+  formatDate,
+  getReadTime,
+  fetchNavCategories,
+} from '../../lib/api'
+import { CATEGORY_FALLBACK, categoryPath, categorySlugOf, topicPath } from '../../lib/config'
+import { buildRelatedTopics } from '../../lib/topics'
+import { breadcrumbJsonLd, siteOrigin, splitShareTitleLines, toPlainShareTitle } from '../../lib/seo'
+
+const { tag } = Astro.params
+const decodedTag = decodeURIComponent(tag || '')
+
+const cmsNavCategories = await fetchNavCategories().catch(() => [])
+const navCategories =
+  cmsNavCategories.length > 0
+    ? cmsNavCategories.map(({ name, slug }) => ({ name, slug }))
+    : [...CATEGORY_FALLBACK]
+
+// 主分類的標籤頁一律導到對應的英文分類網址。
+const mainCategorySlug = categorySlugOf(decodedTag, navCategories)
+if (mainCategorySlug) {
+  return Astro.redirect(categoryPath(mainCategorySlug), 301)
+}
+
+const posts = await fetchPosts()
+
+const tagPosts = posts
+  .filter((p) => p.category === decodedTag || parseMaybeJsonArray(p.tags).includes(decodedTag))
+  .sort((a, b) => {
+    const da = new Date(a.publishedAt || a.updatedAt || 0).getTime()
+    const db = new Date(b.publishedAt || b.updatedAt || 0).getTime()
+    return db - da
+  })
+
+// 側欄的相關主題：跟這個標籤同篇出現過的其他話題，不是固定那四個主分類。
+const relatedTopics = buildRelatedTopics(posts, decodedTag, navCategories, 10)
+
+const DEFAULT_IMAGE =
+  'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9IiMzMzMiLz48L3N2Zz4='
+
+const getSourceDisplay = (post: any) => {
+  const tags = parseMaybeJsonArray(post.tags)
+  if (tags.length > 0) return tags[0].toUpperCase()
+  return 'SOURCES'
+}
+
+const featuredTitleLines = tagPosts[0] ? splitShareTitleLines(tagPosts[0].title) : []
+
+const origin = siteOrigin(Astro.request, Astro.url)
+const tagJsonLd = breadcrumbJsonLd(origin, [
+  { name: '首頁', path: '/' },
+  { name: '所有主題', path: '/tag' },
+  { name: decodedTag, path: `/tag/${encodeURIComponent(decodedTag)}` },
+])
+---
+
+<Base
+  title={`${decodedTag} 新聞`}
+  description={`瀏覽有關 ${decodedTag} 的所有最新新聞及專題。`}
+  noindex={tagPosts.length === 0}
+  jsonLd={tagJsonLd}
+>
+  <div
+    class="w-full bg-[var(--bg)] dark:bg-[#111] text-[var(--ink)] dark:text-zinc-300 min-h-screen selection:bg-red-500/30 pt-12 xl:pt-16 pb-20"
+  >
+    <div class="w-full xl:w-[70%] max-w-full mx-auto px-4 xl:px-0">
+      <header class="mb-16 flex flex-col items-center justify-center text-center">
+        <div
+          class="inline-flex items-center justify-center w-12 h-12 md:w-16 md:h-16 rounded-full bg-[var(--surface-elevated)] dark:bg-zinc-900 shadow-sm mb-6 border border-[var(--line)] dark:border-zinc-800"
+        >
+          <span
+            class="text-2xl md:text-3xl font-black text-[var(--accent)] dark:text-red-500 font-serif leading-none mt-1"
+          >
+            #
+          </span>
+        </div>
+        <h1
+          class="text-4xl md:text-5xl lg:text-7xl font-bold uppercase tracking-tighter text-[var(--ink)] dark:text-white leading-[1] font-en"
+        >
+          {decodedTag}
+        </h1>
+        <p
+          class="mt-4 text-[var(--ink-soft)] dark:text-zinc-500 font-bold tracking-widest uppercase text-sm md:text-base"
+        >
+          收錄 {tagPosts.length} 篇文章
+        </p>
+      </header>
+
+      {
+        tagPosts.length === 0 ? (
+          <div class="text-center py-24 bg-[var(--surface-elevated)] dark:bg-zinc-900/50 rounded-xl border border-[var(--line)] dark:border-zinc-800">
+            <h2 class="text-2xl font-bold text-[var(--ink)] dark:text-zinc-300">找不到文章</h2>
+            <p class="text-[var(--ink-soft)] dark:text-zinc-500 mt-4 text-sm">
+              此標籤目前沒有任何內容。
+            </p>
+          </div>
+        ) : (
+          <div class="flex flex-col gap-12">
+            {tagPosts[0] && (
+              <div class="relative w-full aspect-video md:aspect-[21/9] bg-gray-100 dark:bg-black group overflow-hidden border border-[var(--line)] dark:border-zinc-800 rounded-xl shadow-sm">
+                <a href={'/post/' + tagPosts[0].slug} class="block w-full h-full cursor-pointer">
+                  <img
+                    src={tagPosts[0].coverImage || DEFAULT_IMAGE}
+                    class="w-full h-full object-cover opacity-90 dark:opacity-80 cover-zoom"
+                    alt={toPlainShareTitle(tagPosts[0].title)}
+                  />
+                  <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                  <div class="absolute bottom-0 left-0 w-full p-6 md:p-10 z-10">
+                    <div class="flex items-center gap-2 mb-3 text-[10px] uppercase font-bold tracking-widest text-gray-300">
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        class="text-zinc-400"
+                      >
+                        <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+                      </svg>
+                      <span class="text-red-400 font-black tracking-widest">LATEST NEWS</span>
+                    </div>
+                    <h2
+                      class="text-2xl sm:text-3xl md:text-5xl font-bold text-white group-hover:text-red-400 transition-colors uppercase tracking-tight leading-[1] font-en"
+                    >
+                      {featuredTitleLines.map((line) => (
+                        <span class="block">{line}</span>
+                      ))}
+                    </h2>
+                    {tagPosts[0].description && (
+                      <p class="hidden md:block mt-4 text-gray-300 font-medium text-sm md:text-base max-w-2xl line-clamp-2">
+                        {tagPosts[0].description}
+                      </p>
+                    )}
+                  </div>
+                </a>
+              </div>
+            )}
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div class="lg:col-span-2 flex flex-col">
+                <div class="flex items-center gap-2 pb-4 border-b-2 border-[var(--ink)] dark:border-zinc-800 mb-6">
+                  <svg
+                    width="26"
+                    height="26"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="text-zinc-400"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                  </svg>
+                  <h2 class="text-xl md:text-2xl font-serif font-black text-[var(--ink)] dark:text-zinc-100 uppercase tracking-tight">
+                    最新文章
+                  </h2>
+                </div>
+                <div class="flex flex-col divide-y divide-[var(--line)] dark:divide-zinc-800">
+                  {tagPosts.slice(1).map((post, i) => (
+                    <a
+                      href={'/post/' + post.slug}
+                      class="flex group py-6 items-center gap-4 hover:opacity-80 transition-opacity"
+                    >
+                      <div class="w-32 md:w-48 aspect-video shrink-0 bg-[var(--surface-elevated)] dark:bg-zinc-900 rounded overflow-hidden shadow-sm border border-[var(--line)] dark:border-zinc-800">
+                        <img
+                          src={post.coverImage || DEFAULT_IMAGE}
+                          class="w-full h-full object-cover cover-zoom"
+                          alt={toPlainShareTitle(post.title)}
+                        />
+                      </div>
+                      <div class="flex-1 flex flex-col justify-center">
+                        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2 text-[10px] text-[var(--ink-soft)] dark:text-zinc-500 font-bold uppercase tracking-wider">
+                          <div class="flex items-center gap-1">
+                            <span
+                              class={
+                                (i + 1) % 2 === 0
+                                  ? 'text-red-500'
+                                  : 'text-cyan-600 dark:text-cyan-500'
+                              }
+                            >
+                              [{getSourceDisplay(post)}]
+                            </span>
+                          </div>
+                          <span class="hidden sm:inline opacity-50">|</span>
+                          <div class="hidden sm:block">
+                            {formatDate(post.publishedAt || post.updatedAt).replace(/-/g, '.')}
+                          </div>
+                          <span class="hidden sm:inline opacity-50">|</span>
+                          <div class="hidden sm:block">{getReadTime(post)}</div>
+                        </div>
+                        <h3 class="text-base md:text-lg font-bold text-[var(--ink)] dark:text-zinc-200 group-hover:text-[var(--accent)] dark:group-hover:text-white line-clamp-2 md:line-clamp-3 leading-snug">
+                          {toPlainShareTitle(post.title)}
+                        </h3>
+                        {post.description && (
+                          <p class="hidden lg:block mt-2 text-xs text-[var(--ink-soft)] dark:text-zinc-500 line-clamp-2">
+                            {post.description}
+                          </p>
+                        )}
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+
+              <div class="lg:col-span-1 flex flex-col">
+                <div class="flex items-center gap-2 pb-4 border-b-2 border-[var(--ink)] dark:border-zinc-800 mb-6">
+                  <svg
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="text-zinc-500"
+                  >
+                    <rect x="3" y="3" width="7" height="7" rx="1" />
+                    <rect x="14" y="3" width="7" height="7" rx="1" />
+                    <rect x="14" y="14" width="7" height="7" rx="1" />
+                    <rect x="3" y="14" width="7" height="7" rx="1" />
+                  </svg>
+                  <h2 class="text-xl md:text-2xl font-serif font-black text-[var(--ink)] dark:text-zinc-100 uppercase tracking-tight">
+                    相關主題
+                  </h2>
+                </div>
+                <div class="flex flex-col gap-8">
+                  {relatedTopics.length > 0 ? (
+                    <ul class="flex flex-wrap gap-2">
+                      {relatedTopics.map((topic) => (
+                        <li>
+                          <a
+                            href={topicPath(topic.name, navCategories)}
+                            class="group inline-flex items-baseline gap-1.5 rounded-full border border-[var(--line)] dark:border-zinc-800 bg-[var(--surface-elevated)] dark:bg-[#141416] px-3 py-1.5 text-sm font-bold text-[var(--ink)] dark:text-zinc-300 hover:border-[var(--ink)] dark:hover:border-zinc-500 hover:text-[var(--accent)] dark:hover:text-white transition-[color,border-color,background-color]"
+                          >
+                            <span class="text-[var(--ink-soft)] dark:text-zinc-600 group-hover:text-[var(--accent)] dark:group-hover:text-red-500">
+                              #
+                            </span>
+                            <span>{topic.name}</span>
+                            <span class="text-[10px] font-bold text-[var(--ink-soft)] dark:text-zinc-600 tabular-nums">
+                              {topic.count}
+                            </span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p class="text-xs text-[var(--ink-soft)] dark:text-zinc-500 leading-relaxed">
+                      這個主題目前還沒有其他相關的話題標籤。
+                    </p>
+                  )}
+                  <a
+                    href="/tag"
+                    class="w-full py-4 text-center rounded border border-[var(--line)] dark:border-zinc-800 text-xs font-bold text-[var(--ink-soft)] hover:bg-[var(--surface-elevated)] dark:hover:bg-zinc-900 hover:text-[var(--ink)] dark:hover:text-white uppercase tracking-widest transition-colors mb-20"
+                  >
+                    探索所有主題
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      }
+    </div>
+  </div>
+</Base>

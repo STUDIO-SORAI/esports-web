@@ -1,0 +1,5 @@
+---
+const { slug } = Astro.params
+const query = Astro.url.search
+return Astro.redirect(`/post/${slug}${query}`, 301)
+---

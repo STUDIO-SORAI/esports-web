@@ -1,0 +1,12 @@
+---
+import Base from '../layouts/Base.astro'
+import { SubmitForm } from '../components/SubmitForm'
+---
+
+<Base
+  title="讀者投稿"
+  description="分享你的電競觀點、賽事分析或獨家消息。我們歡迎各類原創內容，審核通過後將署名刊登。"
+  noindex={true}
+>
+  <SubmitForm client:load />
+</Base>
