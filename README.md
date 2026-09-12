@@ -8,11 +8,11 @@
   </p>
 
   <p>
-    <a href="https://esports.sorai.tw"><img src="https://img.shields.io/badge/LIVE_DEMO-esports.sorai.tw-E11D48?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Live Demo" /></a>
-    <a href="https://astro.build/"><img src="https://img.shields.io/badge/Astro_5-FF5D01?style=for-the-badge&logo=astro&logoColor=white" alt="Astro 5" /></a>
-    <a href="https://react.dev/"><img src="https://img.shields.io/badge/React_19-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React 19" /></a>
-    <a href="https://tailwindcss.com/"><img src="https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" alt="Tailwind CSS" /></a>
-    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MPL_2.0-059669?style=for-the-badge" alt="License: MPL 2.0" /></a>
+    <a href="https://esports.sorai.tw"><img src="https://www.shieldcn.dev/badge/LIVE_DEMO-esports.sorai.tw-E11D48?style=for-the-badge&logo=zenbrowser&logoColor=white" alt="Live Demo" /></a>
+    <a href="https://astro.build/"><img src="https://www.shieldcn.dev/badge/Astro_5-FF5D01?style=for-the-badge&logo=astro&logoColor=white" alt="Astro 5" /></a>
+    <a href="https://react.dev/"><img src="https://www.shieldcn.dev/badge/React_19-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React 19" /></a>
+    <a href="https://tailwindcss.com/"><img src="https://www.shieldcn.dev/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" alt="Tailwind CSS" /></a>
+    <a href="LICENSE"><img src="https://www.shieldcn.dev/badge/License-MPL_2.0?style=for-the-badge" alt="License: MPL 2.0" /></a>
   </p>
 
   <p>
