@@ -1,0 +1,74 @@
+---
+import Base from '../../layouts/Base.astro'
+import { fetchPosts, fetchNavCategories } from '../../lib/api'
+import { CATEGORY_FALLBACK, topicPath } from '../../lib/config'
+import { buildTopicIndex } from '../../lib/topics'
+
+const posts = await fetchPosts()
+
+const cmsNavCategories = await fetchNavCategories().catch(() => [])
+const navCategories =
+  cmsNavCategories.length > 0
+    ? cmsNavCategories.map(({ name, slug }) => ({ name, slug }))
+    : [...CATEGORY_FALLBACK]
+
+// 與首頁右欄共用同一份主題索引：主分類已有導覽列與專屬頁，不在這裡重覆列。
+const sortedTags = buildTopicIndex(posts, navCategories)
+---
+
+<Base title="所有主題" description="瀏覽 SORAI ESPORTS 的所有新聞主題與標籤">
+  <div
+    class="w-full bg-[var(--bg)] dark:bg-[#111] text-[var(--ink)] dark:text-zinc-300 min-h-screen selection:bg-red-500/30 pt-12 xl:pt-16 pb-20"
+  >
+    <div class="w-full xl:w-[70%] max-w-full mx-auto px-4 xl:px-0">
+      <header class="mb-16 flex flex-col items-center justify-center text-center">
+        <div
+          class="inline-flex items-center justify-center w-12 h-12 md:w-16 md:h-16 rounded-full bg-[var(--surface-elevated)] dark:bg-zinc-900 shadow-sm mb-6 border border-[var(--line)] dark:border-zinc-800"
+        >
+          <span
+            class="text-2xl md:text-3xl font-black text-[var(--accent)] dark:text-red-500 font-serif leading-none mt-1"
+          >
+            #
+          </span>
+        </div>
+        <h1
+          class="text-4xl md:text-5xl lg:text-7xl font-bold uppercase tracking-tighter text-[var(--ink)] dark:text-white leading-[1] font-en"
+        >
+          所有主題
+        </h1>
+        <p
+          class="mt-4 text-[var(--ink-soft)] dark:text-zinc-500 font-bold tracking-widest uppercase text-sm md:text-base"
+        >
+          探索全站共 {sortedTags.length} 個標籤
+        </p>
+      </header>
+
+      {
+        sortedTags.length === 0 ? (
+          <div class="text-center py-24 bg-[var(--surface-elevated)] dark:bg-zinc-900/50 rounded-xl border border-[var(--line)] dark:border-zinc-800">
+            <h2 class="text-2xl font-bold text-[var(--ink)] dark:text-zinc-300">目前沒有標籤</h2>
+            <p class="text-[var(--ink-soft)] dark:text-zinc-500 mt-4 text-sm">
+              請稍後再回來查看。
+            </p>
+          </div>
+        ) : (
+          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+            {sortedTags.map(({ name: tag, count }) => (
+              <a
+                href={topicPath(tag, navCategories)}
+                class="group flex flex-col p-6 rounded-xl border border-[var(--line)] dark:border-zinc-800 bg-[var(--surface-elevated)] dark:bg-[#111112] hover:bg-[var(--surface)] dark:hover:bg-[#1a1a1c] transition-[background-color,box-shadow,border-color] hover:shadow-md hover:border-[var(--ink)] dark:hover:border-zinc-500 items-center justify-center text-center gap-2"
+              >
+                <span class="text-lg md:text-xl font-bold text-[var(--ink)] dark:text-zinc-100 group-hover:text-[var(--accent)] dark:group-hover:text-cyan-500 transition-colors break-words line-clamp-1 w-full">
+                  {tag}
+                </span>
+                <span class="text-xs font-bold text-[var(--ink-soft)] dark:text-zinc-500 tracking-wider">
+                  {count} 篇文章
+                </span>
+              </a>
+            ))}
+          </div>
+        )
+      }
+    </div>
+  </div>
+</Base>

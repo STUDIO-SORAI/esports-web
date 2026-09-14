@@ -1,0 +1,81 @@
+---
+import Base from '../layouts/Base.astro'
+import BriefsFeed from '../components/BriefsFeed.astro'
+import {
+  fetchBriefs,
+  fetchNavCategories,
+  filterBriefsByCategories,
+  toggleFeedCategory,
+  feedFilterHref,
+} from '../lib/api'
+import { SITE_NAME, siteOrigin } from '../lib/seo'
+import { CATEGORY_FALLBACK } from '../lib/config'
+
+const origin = siteOrigin(Astro.request, Astro.url)
+const briefs = await fetchBriefs(50).catch(() => [])
+const nav = await fetchNavCategories().catch(() => [])
+const games = (nav.length > 0 ? nav : CATEGORY_FALLBACK).filter(
+  (c) => c.slug !== 'opinion' && c.name !== '專欄報導'
+)
+
+const selected = Astro.url.searchParams
+  .getAll('c')
+  .map((s) => s.trim())
+  .filter(Boolean)
+const visible = filterBriefsByCategories(briefs, selected, games)
+const emptyText =
+  selected.length > 0 ? '這個分類目前沒有戰報。' : '目前還沒有戰報快訊。'
+
+const SHORT_LABEL: Record<string, string> = {
+  valorant: '特戰',
+  lol: 'LoL',
+  r6: 'R6',
+  cs2: 'CS2',
+  others: '其他',
+}
+---
+
+<Base
+  title="戰報快訊"
+  description={`${SITE_NAME} 戰報快訊。`}
+  canonical={`${origin}/feed`}
+>
+  <div class="w-full bg-[#111] text-zinc-300 font-sans min-h-screen overflow-x-hidden pb-20">
+    <div class="w-full max-w-[620px] mx-auto px-4 pt-2">
+      <div class="flex flex-nowrap items-center gap-1 sm:gap-1.5 py-3 mb-1 w-full" role="group" aria-label="依遊戲篩選">
+        <a
+          href="/feed"
+          class={`inline-flex items-center justify-center flex-1 min-w-0 rounded-full border px-1.5 sm:px-3 py-1.5 text-[11px] sm:text-[13px] font-medium whitespace-nowrap transition-colors ${
+            selected.length === 0
+              ? 'border-red-500/40 bg-red-500/15 text-red-400'
+              : 'border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600'
+          }`}
+          aria-pressed={selected.length === 0}
+        >
+          全部
+        </a>
+        {
+          games.map((game) => {
+            const active = selected.includes(game.slug)
+            const short = SHORT_LABEL[game.slug] || game.name
+            return (
+              <a
+                href={feedFilterHref(toggleFeedCategory(selected, game.slug))}
+                class={`inline-flex items-center justify-center flex-1 min-w-0 rounded-full border px-1.5 sm:px-3 py-1.5 text-[11px] sm:text-[13px] font-medium whitespace-nowrap transition-colors ${
+                  active
+                    ? 'border-red-500/40 bg-red-500/15 text-red-400'
+                    : 'border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600'
+                }`}
+                aria-pressed={active}
+              >
+                <span class="sm:hidden truncate">{short}</span>
+                <span class="hidden sm:inline truncate">{game.name}</span>
+              </a>
+            )
+          })
+        }
+      </div>
+      <BriefsFeed briefs={visible} compactHeader emptyText={emptyText} />
+    </div>
+  </div>
+</Base>
