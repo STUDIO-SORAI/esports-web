@@ -1,0 +1,59 @@
+name: Sync Back to Monorepo
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: sync-back-to-monorepo
+  cancel-in-progress: true
+
+jobs:
+  sync-back:
+    if: "!contains(github.event.head_commit.message, '[skip sync]')"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Open Source Repo
+        uses: actions/checkout@v4
+        with:
+          path: oss-web
+
+      - name: Checkout Monorepo
+        uses: actions/checkout@v4
+        with:
+          repository: STUDIO-SORAI/esports-sorai
+          token: ${{ secrets.OSS_SYNC_PAT }}
+          ref: master
+          path: monorepo
+
+      - name: Sync changes to apps/web in Monorepo
+        run: |
+          # 同步檔案至 monorepo/apps/web/，排除 .git、node_modules、dist 等開源專屬或暫存檔案
+          rsync -av --delete \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='public' \
+            --exclude='node_modules' \
+            --exclude='dist' \
+            --exclude='.astro' \
+            --exclude='.env*' \
+            --exclude='*.db*' \
+            oss-web/ monorepo/apps/web/
+
+      - name: Commit and Push to Monorepo
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          cd monorepo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add apps/web
+          if git diff --staged --quiet; then
+            echo "No changes to sync back to monorepo."
+            exit 0
+          fi
+          SHORT_SHA=$(echo "$SOURCE_SHA" | cut -c1-7)
+          git commit -m "sync(web): backport changes from STUDIO-SORAI/esports-web@$SHORT_SHA [skip sync]"
+          git push origin master
