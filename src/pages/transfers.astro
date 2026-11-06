@@ -1,0 +1,16 @@
+---
+import Base from '../layouts/Base.astro'
+import { TransfersPage } from '../components/transfers/TransfersPage'
+import { fetchTransfers } from '../lib/api'
+
+const initialTeams = await fetchTransfers('valorant')
+---
+
+<Base
+  title="VALORANT 轉會期名單 | VCT 戰隊陣容追蹤"
+  description="VCT 各賽區合作戰隊與 Ascension 晉升戰隊最新陣容變動、選手合約與轉會動態追蹤。"
+>
+  <div class="w-full pt-3 pb-16 min-h-[70vh]">
+    <TransfersPage client:load initialTeams={initialTeams} />
+  </div>
+</Base>

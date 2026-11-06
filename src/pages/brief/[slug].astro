@@ -1,0 +1,251 @@
+---
+import Base from '../../layouts/Base.astro'
+import { fetchBrief, fetchBriefs, formatFeedTime } from '../../lib/api'
+import { categoryPath, DEFAULT_OG_IMAGE } from '../../lib/config'
+import {
+  siteOrigin,
+  absoluteUrl,
+  toPlainShareTitle,
+  briefArticleJsonLd,
+  breadcrumbJsonLd,
+  SITE_NAME,
+} from '../../lib/seo'
+import { briefBodyToText } from '../../lib/briefBody'
+import { BriefBody } from '../../components/BriefBody'
+import { BriefMedia } from '../../components/BriefMedia'
+import { ShareBlock } from '../../components/ShareBlock'
+
+const { slug } = Astro.params
+const origin = siteOrigin(Astro.request, Astro.url)
+const brief = await fetchBrief(slug!).catch(() => null)
+
+if (!brief) {
+  Astro.response.status = 404
+  return Astro.rewrite('/404')
+}
+
+const displayTitle = toPlainShareTitle(brief.title)
+const summary = briefBodyToText(brief.body)
+const body = summary && summary.trim() !== displayTitle.trim() ? brief.body : ''
+const pageImage = brief.image || DEFAULT_OG_IMAGE
+const canonicalUrl = `${origin}/brief/${slug}`
+
+const authorName = brief.authorNames[0] || SITE_NAME
+const authorImage = brief.authorImages[0] || ''
+const initial = authorName.charAt(0)
+
+const jsonLd = [
+  briefArticleJsonLd({
+    origin,
+    brief,
+    url: canonicalUrl,
+    image: absoluteUrl(origin, pageImage),
+    description: summary || displayTitle,
+  }),
+  breadcrumbJsonLd(origin, [
+    { name: '首頁', path: '/' },
+    { name: '電競快訊', path: '/feed' },
+    { name: displayTitle, path: `/brief/${slug}` },
+  ]),
+]
+
+const allRecent = await fetchBriefs(8).catch(() => [])
+const relatedBriefs = allRecent
+  .filter((b) => b.slug !== slug)
+  .slice(0, 4)
+---
+
+<Base
+  title={displayTitle}
+  description={summary || displayTitle}
+  image={pageImage}
+  type="article"
+  canonical={canonicalUrl}
+  publishedTime={brief.publishedAt}
+  modifiedTime={brief.updatedAt || brief.publishedAt}
+  jsonLd={jsonLd}
+>
+  <main class="min-h-screen bg-[var(--background)] text-[var(--foreground)] font-sans pb-24 pt-4 sm:pt-6">
+    <div class="max-w-[720px] mx-auto px-4">
+      <!-- Breadcrumb / Back Link -->
+      <nav aria-label="路徑導覽" class="mb-4 sm:mb-6">
+        <a
+          href="/feed"
+          class="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors px-2.5 py-1.5 -ml-2.5 rounded-[var(--radius-control)] hover:bg-[var(--surface-muted)]"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+          <span>返回電競快訊</span>
+        </a>
+      </nav>
+
+      <!-- Main Brief Card -->
+      <article class="bg-[var(--surface)] rounded-[var(--radius-panel)] p-5 sm:p-7 shadow-xs">
+        <!-- Author & Meta Header -->
+        <header class="flex items-center justify-between gap-3 pb-4">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="shrink-0">
+              {
+                authorImage ? (
+                  <img
+                    src={authorImage}
+                    alt=""
+                    class="w-10 h-10 rounded-full object-cover bg-[var(--surface-muted)]"
+                  />
+                ) : (
+                  <div class="w-10 h-10 text-sm rounded-full bg-[var(--surface-muted)] text-[var(--foreground)] flex items-center justify-center font-bold">
+                    {initial}
+                  </div>
+                )
+              }
+            </div>
+            <div class="flex flex-col min-w-0">
+              <span class="font-bold text-[15px] text-[var(--foreground)] truncate">
+                {authorName}
+              </span>
+              <time
+                datetime={brief.publishedAt}
+                class="text-xs text-[var(--text-muted)] tabular-nums font-normal"
+              >
+                {formatFeedTime(brief.publishedAt || brief.updatedAt)}
+              </time>
+            </div>
+          </div>
+
+          {
+            brief.category && brief.categorySlug && (
+              <a
+                href={categoryPath(brief.categorySlug)}
+                class="shrink-0 text-xs font-semibold px-2.5 py-1 rounded-[var(--radius-pill)] bg-[var(--surface-muted)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--surface-raised)] transition-colors"
+              >
+                {brief.category}
+              </a>
+            )
+          }
+        </header>
+
+        <!-- Brief Title -->
+        <h1 class="text-xl sm:text-2xl md:text-3xl font-bold text-[var(--foreground)] leading-snug tracking-tight">
+          {displayTitle}
+        </h1>
+
+        <!-- Brief Body (if additional to title) -->
+        {
+          body && (
+            <div class="mt-4 text-[15px] sm:text-base leading-relaxed text-[var(--foreground)] font-normal">
+              <BriefBody client:load body={body} />
+            </div>
+          )
+        }
+
+        <!-- Media Attachment -->
+        {
+          brief.image && (
+            <div class="mt-5 rounded-[var(--radius-panel)] overflow-hidden bg-[var(--surface-muted)] flex justify-center [&>astro-island]:contents">
+              <BriefMedia
+                client:load
+                src={brief.image}
+                alt={displayTitle}
+                mime={brief.imageMime}
+                width={brief.imageWidth}
+                height={brief.imageHeight}
+                className="max-h-[580px] w-auto h-auto max-w-full object-contain"
+              />
+            </div>
+          )
+        }
+
+        <!-- Tags -->
+        {
+          brief.tags && brief.tags.length > 0 && (
+            <div class="mt-6 flex flex-wrap gap-1.5 pt-4">
+              {brief.tags.map((tag) => (
+                <a
+                  href={`/tag/${encodeURIComponent(tag)}`}
+                  class="text-xs font-medium px-2.5 py-1 rounded-[var(--radius-control)] bg-[var(--surface-muted)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--surface-raised)] transition-colors"
+                >
+                  #{tag}
+                </a>
+              ))}
+            </div>
+          )
+        }
+
+        <!-- Action Bar -->
+        <footer class="mt-6 pt-5 flex items-center justify-between gap-3">
+          <ShareBlock client:load title={displayTitle} url={canonicalUrl} />
+          <a
+            href="/feed"
+            class="text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors"
+          >
+            瀏覽更多戰報 &rarr;
+          </a>
+        </footer>
+      </article>
+
+      <!-- More Briefs Recommendation -->
+      {
+        relatedBriefs.length > 0 && (
+          <section class="mt-12" aria-labelledby="more-briefs-heading">
+            <div class="flex items-center justify-between mb-4 px-1">
+              <h2
+                id="more-briefs-heading"
+                class="text-lg font-bold tracking-tight text-[var(--foreground)]"
+              >
+                最新快訊推薦
+              </h2>
+              <a
+                href="/feed"
+                class="text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors"
+              >
+                看全部 &rarr;
+              </a>
+            </div>
+            <div class="flex flex-col gap-3">
+              {relatedBriefs.map((rb) => {
+                const rbTitle = toPlainShareTitle(rb.title)
+                return (
+                  <a
+                    href={`/brief/${rb.slug}`}
+                    class="p-4 rounded-[var(--radius-panel)] bg-[var(--surface)] hover:bg-[var(--surface-muted)] transition-colors shadow-xs flex flex-col gap-1.5 group"
+                  >
+                    <div class="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+                      <span>{rb.authorNames[0] || SITE_NAME}</span>
+                      <span>·</span>
+                      <time datetime={rb.publishedAt}>
+                        {formatFeedTime(rb.publishedAt || rb.updatedAt)}
+                      </time>
+                      {rb.category && (
+                        <>
+                          <span>·</span>
+                          <span class="font-medium text-[var(--text-secondary)]">
+                            {rb.category}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    <h3 class="text-sm sm:text-base font-bold text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors line-clamp-2">
+                      {rbTitle}
+                    </h3>
+                  </a>
+                )
+              })}
+            </div>
+          </section>
+        )
+      }
+    </div>
+  </main>
+</Base>

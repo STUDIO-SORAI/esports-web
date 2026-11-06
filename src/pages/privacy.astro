@@ -1,0 +1,103 @@
+---
+import Legal from '../layouts/Legal.astro'
+import { CONTACT_EMAIL } from '../lib/config'
+---
+
+<Legal
+  title="隱私權政策"
+  description="本政策說明 SORAI ESPORTS 如何蒐集、使用與保存你在本站的資料，包含 Cookie、第一方統計與未來可能使用的 Google 廣告服務。"
+  updated="2026 年 8 月 22 日"
+>
+  <section>
+    <h2>營運者</h2>
+    <p>
+      本網站由 SORAI ESPORTS 營運。關於媒體定位與編輯方針，請見 <a href="/about">關於我們</a>；聯絡方式見 <a href="/contact">聯絡我們</a>。
+    </p>
+    {
+      CONTACT_EMAIL && (
+        <p>
+          隱私相關來信：<a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
+        </p>
+      )
+    }
+  </section>
+
+  <section>
+    <h2>我們蒐集什麼</h2>
+    <ul>
+      <li>你主動提交的資料：讀者投稿表單中的姓名、電子郵件、標題與內文。</li>
+      <li>瀏覽紀錄（第一方）：頁面路徑、瀏覽時間、來源網址、頁面標題，以及僅存在瀏覽器工作階段的匿名 session 識別碼。資料送至本站 <code>/api/analytics</code>，供編輯室了解哪些報導被閱讀，不會出售給廣告商。</li>
+      <li>功能偏好：主題（深色／淺色）與 Cookie 同意狀態，存在你的瀏覽器 localStorage，不會送到伺服器。</li>
+      <li>伺服器日誌：為維運與安全，伺服器可能暫時記錄 IP、瀏覽器類型與請求時間。</li>
+    </ul>
+    <p>我們不使用第三方雲端分析服務。</p>
+  </section>
+
+  <section>
+    <h2>Cookie 與類似技術</h2>
+    <p>本站目前使用的技術包含：</p>
+    <ul>
+      <li>主題偏好（localStorage）：記住你選擇的深色或淺色模式。</li>
+      <li>Cookie 同意紀錄（localStorage）：記住你是否看過並確認本聲明。</li>
+      <li>第一方瀏覽統計（sessionStorage）：匿名 session 識別，關閉分頁後即失效。</li>
+    </ul>
+    <p>
+      這些項目用於網站運作與內容改善，不用于跨站追蹤。你可以使用瀏覽器設定清除網站資料；清除後主題與同意狀態會重設。
+    </p>
+  </section>
+
+  <section>
+    <h2>Google 廣告（AdSense）</h2>
+    <p>
+      本站若啟用 Google AdSense，Google 及其合作夥伴可能使用 Cookie 或類似技術（包含 DoubleClick Cookie）來投放廣告、衡量成效，以及依你在本站或其他網站的瀏覽紀錄提供個人化廣告。
+    </p>
+    <ul>
+      <li>
+        Google 如何使用資料：請見
+        <a href="https://policies.google.com/technologies/ads" rel="noopener noreferrer" target="_blank">Google 廣告資料使用說明</a>
+        與
+        <a href="https://policies.google.com/privacy" rel="noopener noreferrer" target="_blank">Google 隱私權政策</a>。
+      </li>
+      <li>
+        退出個人化廣告：請至
+        <a href="https://www.google.com/settings/ads" rel="noopener noreferrer" target="_blank">Google 廣告設定</a>
+        ，或使用
+        <a href="https://optout.aboutads.info/" rel="noopener noreferrer" target="_blank">DAA 退出頁</a>。
+      </li>
+    </ul>
+    <p>
+      啟用廣告後，我們仍會維持本政策，並在實際投放時於頁面上清楚標示「廣告」。404、搜尋結果、投稿頁與無內容頁不會放置廣告。
+    </p>
+  </section>
+
+  <section>
+    <h2>資料保存與分享</h2>
+    <ul>
+      <li>投稿資料保存至審核結束或依法需要保存的期間。</li>
+      <li>第一方瀏覽統計僅供內部儀表板使用，不會與文章內容一併公開。</li>
+      <li>除法律要求、保護本站與讀者安全，或你已同意的情況外，我們不會把個人資料賣給第三方。</li>
+      <li>網站託管、資料庫與圖片儲存可能由基礎設施供應商處理，他們僅能在提供服務所需範圍內接觸資料。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>你的權利</h2>
+    <p>
+      依《個人資料保護法》，你可請求查詢、閱覽、補充、更正、停止蒐集使用或刪除你的個人資料。請來信說明身分與請求內容，我們會在合理期間處理。純瀏覽統計因無直接識別資訊，通常無法對應到特定個人。
+    </p>
+  </section>
+
+  <section>
+    <h2>未成年人</h2>
+    <p>
+      本站內容以一般電競新聞為主，不針對 13 歲以下兒童蒐集個人資料。若你是未成年人，請在監護人同意下使用本站服務。
+    </p>
+  </section>
+
+  <section>
+    <h2>政策更新</h2>
+    <p>
+      我們可能因服務或法規調整而更新本政策，更新後會修改本頁「最後更新」日期。繼續使用本站即表示你了解更新後的內容。
+    </p>
+  </section>
+</Legal>
