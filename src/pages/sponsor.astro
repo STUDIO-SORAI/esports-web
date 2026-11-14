@@ -1,0 +1,41 @@
+---
+import Base from '../layouts/Base.astro'
+import { InViewTitle } from '../components/arc/in-view-title/in-view-title'
+import { SponsorSolana } from '../components/SponsorSolana'
+import { SponsorTiers } from '../components/SponsorTiers'
+
+const title = '贊助我們'
+const description = '無廣告、非營利，純粹由社群驅動的獨立電競報導。'
+---
+
+<Base
+  title={title}
+  description={description}
+>
+  <div class="max-w-[840px] mx-auto px-4 sm:px-6 w-full pt-8 sm:pt-14 pb-24 font-sans flex flex-col gap-14 sm:gap-16">
+    {/* 頁首與社群自主贊助 (Hero) */}
+    <div class="flex flex-col gap-8">
+      <header class="arc-entrance" style="--stagger: 0;">
+        <InViewTitle
+          client:visible
+          text={title}
+          variant="blur"
+          className="text-3xl sm:text-4xl font-bold tracking-tight text-[var(--foreground)]"
+        />
+        <p class="mt-2 text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed font-normal">
+          {description}
+        </p>
+      </header>
+
+      {/* 雙欄卡片 (Solana Pay + 伺服器支出進度) */}
+      <div class="arc-entrance" style="--stagger: 1;">
+        <SponsorSolana client:load />
+      </div>
+    </div>
+
+    {/* 更多贊助方案計畫 / 組織合作計畫（置於下方） */}
+    <section class="arc-entrance pt-12 border-t border-[var(--border,rgba(128,128,128,0.1))]" style="--stagger: 2;">
+      <SponsorTiers client:load />
+    </section>
+  </div>
+</Base>

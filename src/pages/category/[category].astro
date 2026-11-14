@@ -1,0 +1,150 @@
+---
+import Base from '../../layouts/Base.astro'
+import {
+  fetchPosts,
+  fetchCategories,
+  formatDate,
+  getReadTime,
+} from '../../lib/api'
+import { CATEGORY_FALLBACK, categoryPath, getCategoryLogo, getGameLogoSet } from '../../lib/config'
+import { breadcrumbJsonLd, siteOrigin, toPlainShareTitle } from '../../lib/seo'
+import { Badge } from '../../components/arc/badge/badge'
+import { InViewTitle } from '../../components/arc/in-view-title/in-view-title'
+
+const { category } = Astro.params
+const requestedSlug = decodeURIComponent(category || '').trim().toLowerCase()
+
+const [allPosts, categories] = await Promise.all([
+  fetchPosts(),
+  fetchCategories().catch(() => []),
+])
+
+const knownCategories = categories.length > 0 ? categories : CATEGORY_FALLBACK
+const matchedCategory = knownCategories.find((c) => c.slug === requestedSlug)
+
+if (!matchedCategory) {
+  return new Response(null, { status: 404, statusText: 'Not Found' })
+}
+
+const decodedCategory = matchedCategory.name
+const categorySlug = matchedCategory.slug
+
+const posts = allPosts.filter((post) => {
+  const c = (post.category || '').trim().toLowerCase()
+  return c === requestedSlug || c === decodedCategory.toLowerCase()
+})
+
+const DEFAULT_IMAGE = '/og-image.png'
+
+const categoryLogos = getGameLogoSet(decodedCategory)
+
+const origin = siteOrigin(Astro.request, Astro.url)
+const categoryCanonical = `${origin}${categoryPath(categorySlug)}`
+const categoryJsonLd = breadcrumbJsonLd(origin, [
+  { name: '首頁', path: '/' },
+  { name: decodedCategory, path: categoryPath(categorySlug) },
+])
+---
+
+<Base
+  title={`${decodedCategory} 專題新聞`}
+  description={`探索 ${decodedCategory} 的最新電競賽事報導、戰隊選手專訪與產業焦點。`}
+  noindex={posts.length === 0}
+  jsonLd={categoryJsonLd}
+>
+  <div class="max-w-[1240px] mx-auto px-4 sm:px-6 w-full pt-8 pb-20 font-sans">
+    <div class="mb-10 flex flex-col sm:flex-row justify-between items-start sm:items-baseline gap-4">
+      <div class="flex items-center gap-4">
+        {categoryLogos && (
+          <span class="inline-flex items-center shrink-0">
+            <img
+              src={categoryLogos.dark}
+              alt={decodedCategory}
+              class="h-9 sm:h-11 w-auto object-contain opacity-90 dark:hidden"
+            />
+            <img
+              src={categoryLogos.white}
+              alt={decodedCategory}
+              class="h-9 sm:h-11 w-auto object-contain opacity-90 hidden dark:block"
+            />
+          </span>
+        )}
+        <InViewTitle
+          client:visible
+          text={decodedCategory}
+          variant="blur"
+          className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-[var(--foreground)]"
+        />
+      </div>
+      <span class="text-xs text-[var(--text-secondary)] font-normal tabular-nums">共 {posts.length} 篇報導</span>
+    </div>
+
+    {
+      posts.length === 0 ? (
+        <div class="p-16 text-center rounded-[var(--radius-panel)]  bg-[var(--surface-muted)]">
+          <p class="text-[var(--text-secondary)] text-sm mb-4 font-normal">目前此分類下暫無相關文章。</p>
+          <a
+            href="/"
+            class="inline-flex items-center justify-center px-4 py-2 rounded-[var(--radius-control)] bg-[var(--accent)] text-[var(--accent-foreground)] font-semibold text-xs transition-[opacity,transform] duration-150 hover:opacity-90 active:scale-[0.96]"
+          >
+            返回首頁 &rarr;
+          </a>
+        </div>
+      ) : (
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {posts.map((post, i) => (
+            <a
+              href={`/post/${post.slug}`}
+              class="arc-reveal group flex flex-col bg-[var(--surface)]  hover:bg-[var(--surface-muted)]  rounded-[var(--radius-panel)] overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-1 active:scale-[0.99] transition-[transform,box-shadow,background-color] duration-200"
+              style={`--stagger: ${i};`}
+            >
+              <div class="w-full aspect-[16/9] overflow-hidden bg-[var(--surface-muted)] skullet-img-wrap relative">
+                <img
+                  src={post.coverImage || DEFAULT_IMAGE}
+                  alt={toPlainShareTitle(post.title)}
+                  class="skullet-img w-full h-full object-cover transition-transform duration-300 ease-out group-hover:scale-105"
+                  loading="lazy"
+                  onload="this.dataset.loaded='true'"
+                />
+                {post.category && (
+                  <div class="absolute top-3 left-3 z-10">
+                    <span class="inline-flex items-center gap-1.5 text-xs font-semibold tracking-wide text-white drop-shadow-md">
+                      {(() => {
+                        const logos = getGameLogoSet(post.category)
+                        if (!logos) return null
+                        return (
+                          <img
+                            src={logos.color || logos.white}
+                            alt=""
+                            class="w-3.5 h-3.5 object-contain shrink-0 drop-shadow-sm"
+                          />
+                        )
+                      })()}
+                      <span>#{post.category}</span>
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div class="p-5 flex flex-col flex-1 justify-between gap-4">
+                <div>
+                  <h3 class="font-bold text-base sm:text-lg text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors line-clamp-2 leading-snug tracking-tight">
+                    {toPlainShareTitle(post.title)}
+                  </h3>
+                  {post.description && (
+                    <p class="mt-2 text-xs sm:text-sm text-[var(--text-secondary)] line-clamp-2 leading-relaxed font-normal">
+                      {post.description}
+                    </p>
+                  )}
+                </div>
+                <div class="flex items-center justify-between text-xs text-[var(--text-muted)] pt-3  font-normal">
+                  <span>{formatDate(post.publishedAt)}</span>
+                  <span>{getReadTime(post)}</span>
+                </div>
+              </div>
+            </a>
+          ))}
+        </div>
+      )
+    }
+  </div>
+</Base>

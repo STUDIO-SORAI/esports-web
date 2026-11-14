@@ -1,0 +1,667 @@
+---
+import Base from '../layouts/Base.astro'
+import MobileMatchBar from '../components/MobileMatchBar'
+import TournamentSidebar, { MatchSidebar } from '../components/TournamentSidebar'
+import BriefCardStack from '../components/BriefCardStack'
+import HomeAnnouncementBar from '../components/HomeAnnouncementBar'
+import OpenLetterBanner from '../components/openletter/OpenLetterBanner'
+import { categoryFromPost } from '../lib/api'
+import { InViewTitle } from '../components/arc/in-view-title/in-view-title'
+import { GoogleSourceCard } from '../components/GoogleSourceCard'
+import { SponsorSidebarCard } from '../components/SponsorSidebarCard'
+import { SponsorHeaderBanner } from '../components/SponsorHeaderBanner'
+import { fetchAllTournamentEvents, fetchAllMatches } from '../lib/pandascore'
+import { fetchSignatureCount } from '../lib/petitionCount'
+import {
+  fetchPosts,
+  fetchPost,
+  fetchBriefs,
+  parseMaybeJsonArray,
+  formatDate,
+  formatFeedTime,
+  getReadTime,
+  hasTourRosterTag,
+  fetchNavCategories,
+} from '../lib/api'
+import { CATEGORY_FALLBACK, categoryPath, topicPath, getCategoryLogo, getGameLogoSet } from '../lib/config'
+import { buildTopicIndex } from '../lib/topics'
+import { postsInCategory } from '../lib/categorySections'
+import { splitShareTitleLines, toPlainShareTitle } from '../lib/seo'
+import { briefBodyToText, briefCardMedia } from '../lib/briefBody'
+
+// 快訊短文裡單獨成行的網址會在內頁變成嵌入，首頁卡片只留文字
+const briefCardBody = (b: any) => {
+  const summary = briefBodyToText(b.body)
+  return summary && summary.trim() !== String(b.title).trim() ? summary : ''
+}
+
+const petitionCountPromise = fetchSignatureCount().catch(() => null)
+const cmsNavCategories = await fetchNavCategories().catch(() => [])
+const navCategories =
+  cmsNavCategories.length > 0
+    ? cmsNavCategories.map(({ name, slug }) => ({ name, slug }))
+    : [...CATEGORY_FALLBACK]
+
+// Fetch PandaScore matches & tournaments
+const { upcoming: upcomingTournaments, running: runningTournaments, finished: finishedTournaments } =
+  await fetchAllTournamentEvents()
+const { upcoming: upcomingMatches, running: runningMatches, finished: finishedMatches } =
+  await fetchAllMatches()
+
+// 轉會動態小部件：SSR 每次請求直讀，不加快取
+
+const posts = await fetchPosts()
+const latestBriefs = await fetchBriefs(12).catch(() => [])
+const visiblePosts = posts.filter((p: any) => !hasTourRosterTag(p))
+const sortedPosts = [...visiblePosts].sort((a, b) => {
+  const da = new Date(a.publishedAt || a.updatedAt || 0).getTime()
+  const db = new Date(b.publishedAt || b.updatedAt || 0).getTime()
+  return db - da
+})
+
+const heroPost = sortedPosts[0]
+const heroCategory = heroPost ? (categoryFromPost(heroPost) || '焦點報導') : '焦點報導'
+const heroCategoryLogo = getCategoryLogo(heroCategory)
+const heroTitleLines = heroPost ? splitShareTitleLines(heroPost.title) : []
+const recentPostsBasic = sortedPosts.slice(1, 9)
+
+const recentPosts = await Promise.all(
+  recentPostsBasic.map(async (post) => {
+    const full = await fetchPost(post.slug)
+    return full || post
+  })
+)
+
+// 右欄的主題索引
+const topicIndex = buildTopicIndex(sortedPosts, navCategories)
+const leadTopics = topicIndex.slice(0, 2)
+const chipTopics = topicIndex.slice(2, 12)
+
+const DEFAULT_IMAGE = '/og-image.png'
+
+const briefCards = latestBriefs.map((b: any) => {
+  const media = briefCardMedia(b)
+  return {
+    id: b.id || b.slug,
+    slug: b.slug,
+    title: b.title,
+    body: briefCardBody(b) || b.body || '',
+    image: media?.src || b.image || '',
+    imageMime: media?.mime || b.imageMime || '',
+    category: b.category || '快訊',
+    tags: b.tags || [],
+    authorIds: b.authorIds || [],
+    authorNames: (b.authorNames && b.authorNames.length > 0) ? b.authorNames : ['SORAI'],
+    authorImages: b.authorImages || [],
+    publishedAt: b.publishedAt,
+    updatedAt: b.updatedAt,
+    href: '/brief/' + b.slug,
+  }
+})
+
+const fallbackBriefs = sortedPosts
+  .filter((p: any) => p.slug !== heroPost?.slug)
+  .slice(0, 12)
+  .map((p: any) => {
+    const authors = parseMaybeJsonArray(p.authors)
+    return {
+      id: p.id || p.slug,
+      slug: p.slug,
+      title: p.title,
+      body: p.description || '',
+      image: p.coverImage || '',
+      imageMime: '',
+      category: categoryFromPost(p) || '焦點報導',
+      tags: p.tags || [],
+      authorIds: [],
+      authorNames: authors.length > 0 ? authors : ['SORAI'],
+      authorImages: [],
+      publishedAt: p.publishedAt,
+      updatedAt: p.updatedAt,
+      href: '/post/' + p.slug,
+    }
+  })
+
+const stackBriefs = briefCards.length > 0 ? briefCards : fallbackBriefs
+const petitionCount = await petitionCountPromise
+---
+
+<Base title="SORAI ESPORTS｜中文電競新聞、賽事資訊與產業分析">
+  <div
+    class="w-full bg-[var(--background)] text-[var(--foreground)] font-sans min-h-screen selection:bg-[var(--accent-subtle)] overflow-x-hidden pb-20 relative"
+  >
+    <!-- MOBILE MATCH BAR - Card container within gutters, does not bleed over edges -->
+    <div class="xl:hidden w-full px-4 pt-3 pb-1">
+      <div class="w-full rounded-[var(--radius-panel)] bg-[var(--surface)] overflow-hidden shadow-xs border border-[var(--border)]">
+        <MobileMatchBar
+          client:load
+          upcoming={upcomingMatches}
+          running={runningMatches}
+          finished={finishedMatches}
+        />
+      </div>
+    </div>
+
+    <!-- MOBILE SPONSOR HEADER SECTION -->
+    <div class="xl:hidden w-full px-4 pt-1.5 pb-1">
+      <SponsorHeaderBanner client:load />
+    </div>
+
+    <!-- DESKTOP: sidebars + main content in sticky flex layout -->
+    <div class="xl:flex xl:gap-6 xl:px-4">
+      <!-- LEFT SIDEBAR: Arc Entrance -->
+      <div class="hidden xl:block w-[200px] shrink-0 sticky top-4 self-start arc-entrance" style="--stagger: 0;">
+        <TournamentSidebar
+          client:load
+          upcoming={upcomingTournaments}
+          running={runningTournaments}
+          finished={finishedTournaments}
+        />
+
+        <!-- 賽事中心入口 card, placed right below the 4 tournaments with a gap -->
+        <div class="mt-3">
+          <a
+            href="/matches"
+            class="group block p-3 rounded-[var(--radius-panel)] bg-[var(--surface)] hover:bg-[var(--surface-muted)] transition-[transform,background-color,box-shadow] duration-200 shadow-xs hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] relative overflow-hidden"
+          >
+            <!-- Top: Status & Match Count -->
+            <div class="flex items-center justify-between gap-1 mb-2">
+              {runningMatches.length > 0 ? (
+                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-500/10 dark:bg-red-500/20 text-[var(--accent)] text-[10px] font-bold tracking-wider uppercase">
+                  <span class="relative flex h-1.5 w-1.5">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-[var(--accent)]"></span>
+                  </span>
+                  LIVE
+                </span>
+              ) : (
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--surface-muted)] text-[var(--text-secondary)] text-[10px] font-medium">
+                  賽事中心
+                </span>
+              )}
+              <span class="text-[11px] font-semibold text-[var(--foreground)] tabular-nums">
+                {runningMatches.length > 0 ? `${runningMatches.length} 場對局` : '賽程總覽'}
+              </span>
+            </div>
+
+            <!-- Bottom: Action label & arrow -->
+            <div class="flex items-center justify-between gap-2 pt-0.5">
+              <span class="text-xs font-bold text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors">
+                進入賽事中心
+              </span>
+              <div class="w-6 h-6 rounded-full bg-[var(--surface-raised)] group-hover:bg-[var(--accent)] text-[var(--foreground)] group-hover:text-white flex items-center justify-center transition-[background-color,color,transform] duration-200 shadow-2xs shrink-0 group-hover:translate-x-0.5">
+                <svg
+                  class="w-3 h-3"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M5 12h14"></path>
+                  <path d="m12 5 7 7-7 7"></path>
+                </svg>
+              </div>
+            </div>
+          </a>
+        </div>
+      </div>
+
+      <!-- MAIN CONTENT -->
+      <div class="w-full xl:flex-1 flex flex-col gap-8 sm:gap-10 xl:gap-14 px-4 xl:px-0 pt-3 sm:pt-4 xl:pt-1">
+        <h1 class="sr-only">SORAI ESPORTS 中文電競新聞</h1>
+
+        <!-- HERO SECTION: Arc UI Hero Feature Card with Entrance Animation -->
+        {
+          heroPost && (
+            <div class="arc-entrance group relative w-full aspect-video md:aspect-[21/9] bg-[var(--surface-muted)] skullet-img-wrap overflow-hidden rounded-[var(--radius-panel)] shadow-xs hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.995] transition-[transform,box-shadow] duration-200" style="--stagger: 1;">
+              <a href={'/post/' + heroPost.slug} class="block w-full h-full cursor-pointer">
+                <img
+                  src={heroPost.coverImage || DEFAULT_IMAGE}
+                  class="skullet-img w-full h-full object-cover opacity-90 dark:opacity-85 transition-transform duration-500 ease-out group-hover:scale-105"
+                  alt={toPlainShareTitle(heroPost.title)}
+                  onload="this.dataset.loaded='true'"
+                />
+                <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent z-10" />
+
+                <div class="absolute bottom-0 left-0 w-full p-6 md:p-10 z-20 flex flex-col items-start text-white">
+                  <div class="mb-3">
+                    <span class="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold tracking-wide text-white/95 group-hover:text-white transition-colors drop-shadow-sm">
+                      {heroCategoryLogo && (
+                        <img
+                          src={heroCategoryLogo}
+                          alt=""
+                          class="w-4 h-4 sm:w-4.5 sm:h-4.5 object-contain shrink-0 drop-shadow-sm"
+                        />
+                      )}
+                      <span>#{heroCategory}</span>
+                    </span>
+                  </div>
+                  <h2
+                    class="text-2xl sm:text-3xl md:text-5xl font-bold text-white group-hover:text-[var(--accent)] transition-colors tracking-tight leading-tight"
+                  >
+                    {heroTitleLines.map((line) => (
+                      <span class="block">{line}</span>
+                    ))}
+                  </h2>
+                  {heroPost.description && (
+                    <p class="hidden md:block mt-3 text-white/85 font-normal text-sm md:text-base max-w-2xl line-clamp-2 leading-relaxed">
+                      {heroPost.description}
+                    </p>
+                  )}
+                  <div class="mt-4 flex items-center gap-3 text-xs text-white/70 font-normal">
+                    <span>{formatDate(heroPost.publishedAt || heroPost.updatedAt).replace(/-/g, '.')}</span>
+                    <span>•</span>
+                    <span>{getReadTime(heroPost)}</span>
+                  </div>
+                </div>
+              </a>
+            </div>
+          )
+        }
+
+        <!-- 社群公開信連署模組：四語切換與連署入口 -->
+        <OpenLetterBanner client:load initialCount={petitionCount} />
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:items-stretch">
+          <div class="lg:col-span-2 flex flex-col h-full min-w-0">
+            <!-- 電競快訊 HEADER: InViewTitle with animation, bold, no line, no icon -->
+            <div class="flex items-baseline justify-between mb-3 sm:mb-4">
+              <InViewTitle
+                client:visible
+                text="電競快訊"
+                variant="blur"
+                className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-[var(--foreground)]"
+              />
+              <a
+                href="/feed"
+                class="text-xs sm:text-sm font-semibold text-[var(--text-muted)] hover:text-[var(--foreground)] transition-colors shrink-0 flex items-center gap-1"
+              >
+                看更多 <span aria-hidden="true">&rarr;</span>
+              </a>
+            </div>
+
+            <!-- 電競快訊: Arc UI 3-Card Carousel -->
+            <div class="arc-entrance mb-6 sm:mb-8 xl:mb-10 w-full" style="--stagger: 3;">
+              <BriefCardStack client:load briefs={stackBriefs} />
+            </div>
+
+            <!-- 最新文章 HEADER: InViewTitle with animation, bold, unified font size -->
+            <div class="mb-3 sm:mb-4">
+              <InViewTitle
+                client:visible
+                text="最新文章"
+                variant="blur"
+                className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-[var(--foreground)]"
+              />
+            </div>
+
+            <!-- 最新文章: Arc UI Horizontal Cards with Staggered Scroll Reveal -->
+            <div class="flex flex-col gap-4 min-h-0">
+              {
+                recentPosts.slice(0, 4).map((post, i) => {
+                  const category = categoryFromPost(post)
+                  return (
+                    <a
+                      href={'/post/' + post.slug}
+                      class="arc-reveal group flex flex-row items-stretch rounded-[var(--radius-panel)] bg-[var(--surface)] hover:bg-[var(--surface-muted)] transition-[transform,background-color,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99] overflow-hidden shadow-xs min-h-[136px] sm:min-h-[168px] lg:min-h-[188px]"
+                      style={`--stagger: ${i};`}
+                    >
+                      <div class="w-36 xs:w-44 sm:w-64 md:w-72 lg:w-[290px] aspect-[16/10] shrink-0 self-stretch overflow-hidden bg-[var(--surface-muted)] skullet-img-wrap">
+                        <img
+                          src={post.coverImage || DEFAULT_IMAGE}
+                          class="skullet-img w-full h-full object-cover transition-transform duration-300 ease-out group-hover:scale-105"
+                          alt={toPlainShareTitle(post.title)}
+                          loading="lazy"
+                          onload="this.dataset.loaded='true'"
+                        />
+                      </div>
+                      <div class="p-4 sm:p-5 lg:px-6 lg:py-5 flex-1 flex flex-col justify-center min-w-0">
+                        <div class="flex flex-wrap items-center gap-1.5 mb-1.5">
+                          {category && (
+                            <>
+                              <span class="inline-flex items-center gap-1 text-[11px] font-semibold tracking-wide text-[var(--text-secondary)] group-hover:text-[var(--foreground)] transition-colors">
+                                {(() => {
+                                  const logos = getGameLogoSet(category)
+                                  if (!logos) return null
+                                  if (logos.color) {
+                                    return (
+                                      <img
+                                        src={logos.color}
+                                        alt=""
+                                        class="w-3.5 h-3.5 object-contain shrink-0"
+                                      />
+                                    )
+                                  }
+                                  return (
+                                    <>
+                                      <img
+                                        src={logos.dark}
+                                        alt=""
+                                        class="w-3.5 h-3.5 object-contain shrink-0 dark:hidden"
+                                      />
+                                      <img
+                                        src={logos.white}
+                                        alt=""
+                                        class="w-3.5 h-3.5 object-contain shrink-0 hidden dark:block"
+                                      />
+                                    </>
+                                  )
+                                })()}
+                                <span>#{category}</span>
+                              </span>
+                              <span class="text-[var(--text-muted)] text-[11px] opacity-50">•</span>
+                            </>
+                          )}
+                          <time class="text-[11px] text-[var(--text-muted)] font-normal">
+                            {formatDate(post.publishedAt || post.updatedAt).replace(/-/g, '.')}
+                          </time>
+                          <span class="text-[var(--text-muted)] text-[11px] opacity-50">•</span>
+                          <span class="text-[11px] text-[var(--text-muted)] font-normal">
+                            {getReadTime(post)}
+                          </span>
+                        </div>
+                        <h3 class="text-sm sm:text-base md:text-lg lg:text-[19px] font-bold text-[var(--foreground)] group-hover:text-[var(--accent)] line-clamp-2 leading-snug tracking-tight transition-colors">
+                          {toPlainShareTitle(post.title)}
+                        </h3>
+                        {post.description && (
+                          <p class="mt-2 text-xs sm:text-sm text-[var(--text-secondary)] line-clamp-2 leading-relaxed font-normal">
+                            {post.description}
+                          </p>
+                        )}
+                      </div>
+                    </a>
+                  )
+                })
+              }
+            </div>
+          </div>
+
+          <!-- 主題索引（1/3 欄） -->
+          <div class="lg:col-span-1 flex flex-col h-full min-w-0">
+            <!-- 主題分類 HEADER: InViewTitle with animation, bold, unified font size -->
+            <div class="mb-3 sm:mb-4">
+              <InViewTitle
+                client:visible
+                text="主題分類"
+                variant="blur"
+                className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-[var(--foreground)]"
+              />
+            </div>
+
+            <div class="flex flex-col gap-4 flex-1 min-h-0">
+              {
+                leadTopics.map((topic, i) => (
+                  <div
+                    class="arc-reveal group flex flex-col rounded-[var(--radius-panel)] bg-[var(--surface)] hover:bg-[var(--surface-muted)] transition-[transform,background-color,box-shadow] duration-200 hover:-translate-y-1 hover:shadow-md active:scale-[0.99] overflow-hidden shadow-xs"
+                    style={`--stagger: ${i};`}
+                  >
+                    <a href={'/post/' + topic.latestPost.slug} class="flex flex-col">
+                      <div class="relative w-full aspect-video shrink-0 overflow-hidden bg-[var(--surface-muted)] skullet-img-wrap">
+                        <img
+                          src={topic.latestPost.coverImage || DEFAULT_IMAGE}
+                          class="skullet-img w-full h-full object-cover transition-transform duration-300 ease-out group-hover:scale-105"
+                          alt={toPlainShareTitle(topic.latestPost.title)}
+                          loading="lazy"
+                          onload="this.dataset.loaded='true'"
+                        />
+                        <div class="absolute top-2.5 left-2.5 z-10">
+                          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-black/60 backdrop-blur-md text-white">
+                            #{topic.name}
+                          </span>
+                        </div>
+                      </div>
+                      <div class="p-4 pb-0">
+                        <h4 class="text-sm sm:text-base font-bold text-[var(--foreground)] group-hover:text-[var(--accent)] leading-snug transition-colors line-clamp-2 tracking-tight">
+                          {toPlainShareTitle(topic.latestPost.title)}
+                        </h4>
+                      </div>
+                    </a>
+                    <div class="p-4 pt-3 mt-auto flex items-center justify-between text-xs text-[var(--text-muted)] font-normal mt-3">
+                      <span>
+                        {formatDate(topic.latestPost.publishedAt || topic.latestPost.updatedAt).replace(/-/g, '.')}
+                      </span>
+                      <a
+                        href={topicPath(topic.name, navCategories)}
+                        class="font-semibold text-[var(--accent)] hover:underline shrink-0"
+                      >
+                        {topic.count} 篇報導 &rarr;
+                      </a>
+                    </div>
+                  </div>
+                ))
+              }
+
+              {
+                chipTopics.length > 0 && (
+                  <div class="arc-reveal flex flex-col p-4 rounded-[var(--radius-panel)] bg-[var(--surface)] shadow-xs" style="--stagger: 2;">
+                    <div class="mb-3 flex items-center justify-between">
+                      <h3 class="text-xs font-bold uppercase text-[var(--text-muted)] tracking-wider">
+                        熱門主題
+                      </h3>
+                      <span class="text-xs text-[var(--text-muted)]">話題標籤</span>
+                    </div>
+                    <ul class="flex flex-wrap gap-2">
+                      {chipTopics.map((topic) => (
+                        <li>
+                          <a
+                            href={topicPath(topic.name, navCategories)}
+                            class="group inline-flex items-baseline gap-1.5 rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--surface)] hover:text-[var(--accent)] active:scale-[0.98] transition-[transform,color,background-color] duration-150"
+                          >
+                            <span class="text-[var(--text-muted)] group-hover:text-[var(--accent)] font-semibold">
+                              #
+                            </span>
+                            <span>{topic.name}</span>
+                            <span class="text-[10px] text-[var(--text-muted)] tabular-nums">
+                              {topic.count}
+                            </span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )
+              }
+
+              <a
+                href="/tag"
+                class="arc-reveal w-full py-3 text-center rounded-[var(--radius-control)] bg-[var(--surface)] hover:bg-[var(--surface-muted)] text-xs font-semibold text-[var(--foreground)] active:scale-[0.98] transition-[transform,color,background-color] duration-150 shadow-xs"
+                style="--stagger: 3;"
+              >
+                探索更多主題 &rarr;
+              </a>
+
+              <div class="mt-auto pt-2 arc-reveal" style="--stagger: 4;">
+                <GoogleSourceCard client:load />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CATEGORY SECTIONS: Bento Hierarchy Grid with Arc UI styling & Entrance Motion -->
+        <div class="flex flex-col gap-10 sm:gap-12 xl:gap-16 mt-6 sm:mt-8">
+          {
+            navCategories.map(({ name: category, slug: categorySlug }) => {
+              const categoryPosts = postsInCategory(sortedPosts, {
+                name: category,
+                slug: categorySlug,
+              })
+              if (categoryPosts.length === 0) return null
+
+              const logos = getGameLogoSet(category)
+
+              return (
+                <div class="flex flex-col">
+                  {/* Section Header: InViewTitle with animation, bold, unified font size */}
+                  <div class="flex items-baseline justify-between mb-3 sm:mb-4">
+                    <div class="flex items-center gap-3">
+                      {logos && (
+                        <span class="inline-flex items-center shrink-0">
+                          <img
+                            src={logos.dark}
+                            alt={category}
+                            class="h-7 w-auto object-contain opacity-85 dark:hidden"
+                          />
+                          <img
+                            src={logos.white}
+                            alt={category}
+                            class="h-7 w-auto object-contain opacity-85 hidden dark:block"
+                          />
+                        </span>
+                      )}
+                      <InViewTitle
+                        client:visible
+                        text={category}
+                        variant="blur"
+                        className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-[var(--foreground)]"
+                      />
+                    </div>
+                    <a
+                      href={categoryPath(categorySlug)}
+                      class="text-xs sm:text-sm font-semibold text-[var(--text-muted)] hover:text-[var(--foreground)] transition-colors flex items-center gap-1"
+                    >
+                      查看全部 <span aria-hidden="true">&rarr;</span>
+                    </a>
+                  </div>
+
+                  {/* Bento Hierarchy: 1 Major Card (2x2) + 2 Medium Cards + 1 Wide Card */}
+                  <div class="grid grid-cols-1 md:grid-cols-4 auto-rows-[220px] md:auto-rows-[190px] lg:auto-rows-[220px] gap-4">
+                    {/* Featured Bento Card (2x2) */}
+                    {categoryPosts[0] && (
+                      <a
+                        href={'/post/' + categoryPosts[0].slug}
+                        class="arc-reveal group relative rounded-[var(--radius-panel)] md:col-span-2 md:row-span-2 overflow-hidden bg-[var(--surface-muted)] skullet-img-wrap shadow-xs hover:shadow-lg hover:-translate-y-1 active:scale-[0.99] transition-[transform,box-shadow] duration-200"
+                        style="--stagger: 0;"
+                      >
+                        <img
+                          src={categoryPosts[0].coverImage || DEFAULT_IMAGE}
+                          class="skullet-img absolute inset-0 w-full h-full object-cover opacity-90 transition-transform duration-500 ease-out group-hover:scale-105"
+                          alt={toPlainShareTitle(categoryPosts[0].title)}
+                          onload="this.dataset.loaded='true'"
+                        />
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent z-10" />
+                        <div class="absolute bottom-0 left-0 p-6 md:p-8 w-full text-white z-20 flex flex-col justify-end">
+                          <h3 class="text-xl md:text-2xl lg:text-3xl font-bold text-white line-clamp-2 md:line-clamp-3 leading-tight group-hover:text-[var(--accent)] transition-colors drop-shadow-sm tracking-tight">
+                            {toPlainShareTitle(categoryPosts[0].title)}
+                          </h3>
+                          <div class="mt-3 flex items-center gap-2 text-xs text-white/80 font-normal">
+                            <span>
+                              {formatDate(
+                                categoryPosts[0].publishedAt || categoryPosts[0].updatedAt
+                              ).replace(/-/g, '.')}
+                            </span>
+                            <span>•</span>
+                            <span>{getReadTime(categoryPosts[0])}</span>
+                          </div>
+                        </div>
+                      </a>
+                    )}
+
+                    {/* Bento Card 2 (1x1) */}
+                    {categoryPosts[1] && (
+                      <a
+                        href={'/post/' + categoryPosts[1].slug}
+                        class="arc-reveal group relative rounded-[var(--radius-panel)] md:col-span-1 md:row-span-1 overflow-hidden bg-[var(--surface-muted)] skullet-img-wrap shadow-xs hover:shadow-md hover:-translate-y-1 active:scale-[0.99] transition-[transform,box-shadow] duration-200"
+                        style="--stagger: 1;"
+                      >
+                        <img
+                          src={categoryPosts[1].coverImage || DEFAULT_IMAGE}
+                          class="skullet-img absolute inset-0 w-full h-full object-cover opacity-85 transition-transform duration-300 ease-out group-hover:scale-105"
+                          alt={toPlainShareTitle(categoryPosts[1].title)}
+                          onload="this.dataset.loaded='true'"
+                        />
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent z-10" />
+                        <div class="absolute bottom-0 left-0 p-4 w-full text-white z-20">
+                          <h3 class="text-sm md:text-[15px] font-bold line-clamp-2 leading-snug group-hover:text-[var(--accent)] transition-colors drop-shadow-sm tracking-tight">
+                            {toPlainShareTitle(categoryPosts[1].title)}
+                          </h3>
+                        </div>
+                      </a>
+                    )}
+
+                    {/* Bento Card 3 (1x1) */}
+                    {categoryPosts[2] && (
+                      <a
+                        href={'/post/' + categoryPosts[2].slug}
+                        class="arc-reveal group relative rounded-[var(--radius-panel)] md:col-span-1 md:row-span-1 overflow-hidden bg-[var(--surface-muted)] skullet-img-wrap shadow-xs hover:shadow-md hover:-translate-y-1 active:scale-[0.99] transition-[transform,box-shadow] duration-200"
+                        style="--stagger: 2;"
+                      >
+                        <img
+                          src={categoryPosts[2].coverImage || DEFAULT_IMAGE}
+                          class="skullet-img absolute inset-0 w-full h-full object-cover opacity-85 transition-transform duration-300 ease-out group-hover:scale-105"
+                          alt={toPlainShareTitle(categoryPosts[2].title)}
+                          onload="this.dataset.loaded='true'"
+                        />
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent z-10" />
+                        <div class="absolute bottom-0 left-0 p-4 w-full text-white z-20">
+                          <h3 class="text-sm md:text-[15px] font-bold line-clamp-2 leading-snug group-hover:text-[var(--accent)] transition-colors drop-shadow-sm tracking-tight">
+                            {toPlainShareTitle(categoryPosts[2].title)}
+                          </h3>
+                        </div>
+                      </a>
+                    )}
+
+                    {/* Wide Bento Card 4 (2x1) */}
+                    {categoryPosts[3] && (
+                      <a
+                        href={'/post/' + categoryPosts[3].slug}
+                        class="arc-reveal group relative rounded-[var(--radius-panel)] md:col-span-2 md:row-span-1 overflow-hidden bg-[var(--surface-muted)] skullet-img-wrap shadow-xs hover:shadow-md hover:-translate-y-1 active:scale-[0.99] transition-[transform,box-shadow] duration-200"
+                        style="--stagger: 3;"
+                      >
+                        <img
+                          src={categoryPosts[3].coverImage || DEFAULT_IMAGE}
+                          class="skullet-img absolute inset-0 w-full h-full object-cover opacity-85 transition-transform duration-300 ease-out group-hover:scale-105"
+                          alt={toPlainShareTitle(categoryPosts[3].title)}
+                          onload="this.dataset.loaded='true'"
+                        />
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent z-10" />
+                        <div class="absolute bottom-0 left-0 p-4 md:p-5 w-full text-white z-20 flex flex-col justify-end">
+                          <h3 class="text-sm md:text-base font-bold line-clamp-2 leading-snug group-hover:text-[var(--accent)] transition-colors drop-shadow-sm tracking-tight">
+                            {toPlainShareTitle(categoryPosts[3].title)}
+                          </h3>
+                          <div class="mt-1 text-xs text-white/80 font-normal">
+                            {formatDate(
+                              categoryPosts[3].publishedAt || categoryPosts[3].updatedAt
+                            ).replace(/-/g, '.')}
+                          </div>
+                        </div>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )
+            })
+          }
+        </div>
+      </div>
+
+      <!-- RIGHT SIDEBAR: Arc Entrance -->
+      <div class="hidden xl:block w-[200px] shrink-0 sticky top-4 self-start arc-entrance" style="--stagger: 2;">
+        <MatchSidebar
+          client:load
+          upcoming={upcomingMatches}
+          running={runningMatches}
+          finished={finishedMatches}
+        />
+      </div>
+    </div>
+  </div>
+
+  <!-- Arc UI Announcement Bar: fixed 於視窗 vh 最底部，支援點擊 X 關閉 -->
+  <HomeAnnouncementBar client:load />
+
+  <!-- 首頁固定右下角贊助卡片（維持原 component，不可關閉） -->
+  <div class="hidden md:block fixed bottom-16 right-6 z-30 w-[200px] shadow-lg rounded-[var(--radius-panel)]">
+    <SponsorSidebarCard client:load />
+  </div>
+</Base>
+
+<script>
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    document.querySelectorAll<HTMLVideoElement>('video[autoplay]').forEach((v) => {
+      v.autoplay = false
+      v.pause()
+    })
+  }
+</script>

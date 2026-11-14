@@ -1,0 +1,30 @@
+---
+import Base from '../layouts/Base.astro'
+import { OpenLetterPage } from '../components/openletter/OpenLetterPage'
+import { DEFAULT_PETITION_LANGUAGE, isPetitionLanguage } from '../lib/petition'
+import { fetchSignatureCount } from '../lib/petitionCount'
+import { fetchOpenLetterLogos } from '../lib/openLetterLogos'
+
+// 語言可以用 ?lang=en|vi|ja|zh 直接指定，方便分享特定語言的版本。
+const requested = Astro.url.searchParams.get('lang')
+const initialLanguage = isPetitionLanguage(requested) ? requested : DEFAULT_PETITION_LANGUAGE
+// 先帶一份人數與合作單位 Logo 進 SSR，避免第一次載入時畫面跳動
+const [initialCount, initialLogos] = await Promise.all([
+  fetchSignatureCount(),
+  fetchOpenLetterLogos(),
+])
+---
+
+<Base
+  title="公開信：致 Riot Games 全球電競管理部門"
+  description="關於太平洋職業聯賽營運現況的聯合公開信，針對硬體保障、賽務裁決、賽程規劃與次級生態提出六項訴求。含懶人包與完整引用來源，中文、英文、越南文與日文對照，歡迎連署。"
+  image="/og-openletter.png"
+  type="article"
+>
+  <OpenLetterPage
+    client:load
+    initialLanguage={initialLanguage}
+    initialCount={initialCount}
+    initialLogos={initialLogos}
+  />
+</Base>
