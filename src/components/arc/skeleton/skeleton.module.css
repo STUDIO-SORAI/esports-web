@@ -1,0 +1,40 @@
+.root { display: flex; width: 100%; min-width: 0; align-items: flex-start; gap: var(--space-4); }
+/* Skullet-inspired synchronous shimmer with smooth 20deg gradient sweep */
+.avatar, .line {
+  display: block;
+  flex: 0 0 auto;
+  border-radius: var(--radius-control);
+  background-color: var(--skullet-base, rgb(128 128 128 / 0.15));
+  background-image: linear-gradient(
+    110deg,
+    transparent 0%,
+    transparent 30%,
+    var(--skullet-highlight, rgb(255 255 255 / 0.14)) 50%,
+    transparent 70%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: skullet-shimmer 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+.avatar { width: var(--control-height-md); height: var(--control-height-md); border-radius: var(--radius-pill); }
+.lines { display: grid; flex: 1; gap: var(--space-3); padding-top: var(--space-1); }
+.line { width: 100%; height: var(--space-3); }
+.line:first-child { width: 48%; height: var(--space-4); }
+.line:last-child { width: 72%; }
+.frame { position: relative; display: flow-root; }
+
+@keyframes skullet-shimmer {
+  0% {
+    background-position: 180% 0;
+  }
+  100% {
+    background-position: -180% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .avatar, .line {
+    animation: none;
+    background-image: none;
+  }
+}

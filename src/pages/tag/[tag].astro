@@ -1,0 +1,249 @@
+---
+import Base from '../../layouts/Base.astro'
+import { Badge } from '../../components/arc/badge/badge'
+import { InViewTitle } from '../../components/arc/in-view-title/in-view-title'
+import {
+  fetchPosts,
+  parseMaybeJsonArray,
+  formatDate,
+  getReadTime,
+  fetchNavCategories,
+} from '../../lib/api'
+import { CATEGORY_FALLBACK, categoryPath, categorySlugOf, topicPath, getCategoryLogo, getGameLogoSet } from '../../lib/config'
+import { buildRelatedTopics } from '../../lib/topics'
+import { breadcrumbJsonLd, siteOrigin, splitShareTitleLines, toPlainShareTitle } from '../../lib/seo'
+
+const { tag } = Astro.params
+const decodedTag = decodeURIComponent(tag || '')
+
+const cmsNavCategories = await fetchNavCategories().catch(() => [])
+const navCategories =
+  cmsNavCategories.length > 0
+    ? cmsNavCategories.map(({ name, slug }) => ({ name, slug }))
+    : [...CATEGORY_FALLBACK]
+
+// 主分類的標籤頁一律導到對應的英文分類網址。
+const mainCategorySlug = categorySlugOf(decodedTag, navCategories)
+if (mainCategorySlug) {
+  return Astro.redirect(categoryPath(mainCategorySlug), 301)
+}
+
+const posts = await fetchPosts()
+
+// 比對文章的話題標籤（完全吻合才算）。
+const tagPosts = posts.filter((post) => {
+  const tags = parseMaybeJsonArray(post.tags)
+  return tags.some((t) => t.toLowerCase() === decodedTag.toLowerCase())
+})
+
+const DEFAULT_IMAGE = '/og-image.png'
+
+
+// 相關主題列表。
+const relatedTopics = buildRelatedTopics(tagPosts, decodedTag, navCategories)
+
+const featuredTitleLines = tagPosts[0] ? splitShareTitleLines(tagPosts[0].title) : []
+
+const origin = siteOrigin(Astro.request, Astro.url)
+const tagCanonical = `${origin}/tag/${encodeURIComponent(decodedTag)}`
+const tagJsonLd = breadcrumbJsonLd(origin, [
+  { name: '首頁', path: '/' },
+  { name: '所有話題', path: '/tag' },
+  { name: `#${decodedTag}`, path: `/tag/${encodeURIComponent(decodedTag)}` },
+])
+---
+
+<Base
+  title={`#${decodedTag}`}
+  description={`探索關於 #${decodedTag} 的最新電競新聞、專題報導與賽事分析`}
+  canonical={tagCanonical}
+  noindex={tagPosts.length === 0}
+  jsonLd={tagJsonLd}
+>
+  <div
+    class="w-full bg-[var(--background)] text-[var(--foreground)] min-h-screen selection:bg-[var(--accent-subtle)] pt-12 xl:pt-16 pb-20 font-sans"
+  >
+    <div class="w-full xl:w-[70%] max-w-full mx-auto px-4 xl:px-0">
+      <header class="mb-16 flex flex-col items-center justify-center text-center">
+        <div
+          class="inline-flex items-center justify-center w-12 h-12 md:w-16 md:h-16 rounded-full bg-[var(--surface)] shadow-xs mb-6 "
+        >
+          <span
+            class="text-2xl md:text-3xl font-bold text-[var(--accent)] leading-none"
+          >
+            #
+          </span>
+        </div>
+        <h1
+          class="text-4xl md:text-5xl lg:text-7xl font-bold tracking-tight text-[var(--foreground)] leading-[1] font-en"
+        >
+          {decodedTag}
+        </h1>
+        <p
+          class="mt-4 text-[var(--text-secondary)] font-normal text-sm md:text-base"
+        >
+          收錄 {tagPosts.length} 篇文章
+        </p>
+      </header>
+
+      {
+        tagPosts.length === 0 ? (
+          <div class="text-center py-24 bg-[var(--surface)] rounded-[var(--radius-panel)]  shadow-xs">
+            <h2 class="text-2xl font-bold text-[var(--foreground)]">找不到文章</h2>
+            <p class="text-[var(--text-secondary)] mt-4 text-sm font-normal">
+              此標籤目前沒有任何內容。
+            </p>
+          </div>
+        ) : (
+          <div class="flex flex-col gap-12">
+            {tagPosts[0] && (
+              <div class="arc-entrance group relative w-full aspect-video md:aspect-[21/9] bg-[var(--surface-muted)] overflow-hidden  rounded-[var(--radius-panel)] shadow-xs hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.995] transition-[transform,box-shadow] duration-200">
+                <a href={'/post/' + tagPosts[0].slug} class="block w-full h-full cursor-pointer">
+                  <img
+                    src={tagPosts[0].coverImage || DEFAULT_IMAGE}
+                    class="w-full h-full object-cover opacity-90 dark:opacity-85 transition-transform duration-500 ease-out group-hover:scale-105"
+                    alt={toPlainShareTitle(tagPosts[0].title)}
+                  />
+                  <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent z-10" />
+                  <div class="absolute bottom-0 left-0 w-full p-6 md:p-10 z-20 flex flex-col items-start text-white">
+                    <div class="mb-3">
+                      <span class="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold tracking-wide text-white/95 group-hover:text-white transition-colors">
+                        <span>#焦點報導</span>
+                      </span>
+                    </div>
+                    <h2
+                      class="text-2xl sm:text-3xl md:text-5xl font-bold text-white group-hover:text-[var(--accent)] transition-colors tracking-tight leading-tight"
+                    >
+                      {featuredTitleLines.map((line) => (
+                        <span class="block">{line}</span>
+                      ))}
+                    </h2>
+                    {tagPosts[0].description && (
+                      <p class="hidden md:block mt-3 text-white/85 font-normal text-sm md:text-base max-w-2xl line-clamp-2 leading-relaxed">
+                        {tagPosts[0].description}
+                      </p>
+                    )}
+                  </div>
+                </a>
+              </div>
+            )}
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div class="lg:col-span-2 flex flex-col">
+                <div class="mb-6">
+                  <InViewTitle
+                    client:visible
+                    text="最新文章"
+                    variant="blur"
+                    className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-[var(--foreground)]"
+                  />
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  {tagPosts.slice(1).map((post, i) => {
+                    const category = post.category || (parseMaybeJsonArray(post.tags)[0] ?? '')
+                    return (
+                      <a
+                        href={'/post/' + post.slug}
+                        class="arc-reveal group flex flex-col h-full rounded-[var(--radius-panel)]  bg-[var(--surface)] hover:bg-[var(--surface-muted)]  transition-[transform,background-color,box-shadow] duration-200 hover:-translate-y-1 hover:shadow-md active:scale-[0.99] overflow-hidden shadow-xs"
+                        style={`--stagger: ${i};`}
+                      >
+                        <div class="relative w-full aspect-video overflow-hidden bg-[var(--surface-muted)] skullet-img-wrap">
+                          <img
+                            src={post.coverImage || DEFAULT_IMAGE}
+                            class="skullet-img w-full h-full object-cover transition-transform duration-300 ease-out group-hover:scale-105"
+                            alt={toPlainShareTitle(post.title)}
+                            loading="lazy"
+                            onload="this.dataset.loaded='true'"
+                          />
+                          {category && (
+                            <div class="absolute top-3 left-3 z-10">
+                              <span class="inline-flex items-center gap-1.5 text-xs font-semibold tracking-wide text-white drop-shadow-md">
+                                {(() => {
+                                  const logos = getGameLogoSet(category)
+                                  if (!logos) return null
+                                  return (
+                                    <img
+                                      src={logos.color || logos.white}
+                                      alt=""
+                                      class="w-3.5 h-3.5 object-contain shrink-0 drop-shadow-sm"
+                                    />
+                                  )
+                                })()}
+                                <span>#{category}</span>
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div class="p-5 flex flex-col flex-1 justify-between">
+                          <div>
+                            <h3 class="text-base sm:text-lg font-bold tracking-tight text-[var(--foreground)] group-hover:text-[var(--accent)] line-clamp-2 leading-snug transition-colors">
+                              {toPlainShareTitle(post.title)}
+                            </h3>
+                            {post.description && (
+                              <p class="mt-2 text-xs sm:text-sm text-[var(--text-secondary)] line-clamp-2 leading-relaxed font-normal">
+                                {post.description}
+                              </p>
+                            )}
+                          </div>
+                          <div class="mt-4 pt-3  flex items-center justify-between text-xs text-[var(--text-muted)] font-normal">
+                            <span class="truncate">
+                              {formatDate(post.publishedAt || post.updatedAt).replace(/-/g, '.')}
+                            </span>
+                            <span class="shrink-0">{getReadTime(post)}</span>
+                          </div>
+                        </div>
+                      </a>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div class="lg:col-span-1 flex flex-col">
+                <div class="mb-6">
+                  <InViewTitle
+                    client:visible
+                    text="相關主題"
+                    variant="blur"
+                    className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-[var(--foreground)]"
+                  />
+                </div>
+                <div class="flex flex-col gap-6">
+                  {relatedTopics.length > 0 ? (
+                    <ul class="flex flex-wrap gap-2">
+                      {relatedTopics.map((topic) => (
+                        <li>
+                          <a
+                            href={topicPath(topic.name, navCategories)}
+                            class="group inline-flex items-baseline gap-1.5 rounded-full  bg-[var(--surface)] px-3 py-1.5 text-sm font-semibold text-[var(--foreground)]  hover:bg-[var(--surface-muted)] hover:text-[var(--accent)] active:scale-[0.98] transition-[color,background-color,transform] duration-150 shadow-xs"
+                          >
+                            <span class="text-[var(--text-muted)] group-hover:text-[var(--accent)]">
+                              #
+                            </span>
+                            <span>{topic.name}</span>
+                            <span class="text-xs font-normal text-[var(--text-muted)] tabular-nums">
+                              {topic.count}
+                            </span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p class="text-xs text-[var(--text-secondary)] leading-relaxed font-normal">
+                      這個主題目前還沒有其他相關的話題標籤。
+                    </p>
+                  )}
+                  <a
+                    href="/tag"
+                    class="w-full py-3.5 text-center rounded-[var(--radius-control)]  text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]  active:scale-[0.98] transition-[color,background-color,transform] duration-150 mb-20 shadow-xs"
+                  >
+                    探索所有主題 &rarr;
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      }
+    </div>
+  </div>
+</Base>

@@ -1,0 +1,14 @@
+---
+import Base from '../../layouts/Base.astro'
+import { SignaturesDashboard } from '../../components/openletter/SignaturesDashboard'
+import { SIGNATURE_STATS } from '../../data/openLetter/signaturesSnapshot'
+---
+
+<Base
+  title="社群連署數據與心聲分析 - 致 Riot Games 聯合公開信 | SORAI ESPORTS"
+  description={`收錄 ${SIGNATURE_STATS.totalCount} 位亞太各地選手、從業人員與忠實觀眾的公開信連署數據統計與 ${SIGNATURE_STATS.messageCount} 則真實留言心聲。依隱私規範全數匿名化呈現。`}
+  image="/og-openletter.png"
+  type="article"
+>
+  <SignaturesDashboard client:load />
+</Base>

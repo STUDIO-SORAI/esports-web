@@ -1,0 +1,38 @@
+---
+// 轉會動態獨立頁。小部件先放這裡驗證，確定沒問題之後再決定怎麼放進首頁
+// （2026-11-08 決議，見 design.md §14.4）。元件與首頁版本完全相同，只換容器。
+import Base from '../../layouts/Base.astro'
+import TransferMovesSidebar from '../../components/TransferMovesSidebar'
+import { fetchTransferMoves } from '../../lib/api'
+import { InViewTitle } from '../../components/arc/in-view-title/in-view-title'
+
+const moves = await fetchTransferMoves().catch(() => [])
+---
+
+<Base
+  title="轉會動態 | 選手異動即時追蹤"
+  description="四款遊戲的官宣與傳聞選手異動即時追蹤，資料來自各戰隊名冊變動。"
+>
+  <div class="max-w-[1360px] mx-auto px-3 sm:px-4 md:px-6 w-full pt-3 pb-16 min-h-[70vh] font-sans">
+    <div class="mb-5 sm:mb-6">
+      <InViewTitle
+        client:visible
+        text="轉會動態"
+        variant="blur"
+        className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-[var(--foreground)]"
+      />
+      <p class="mt-3 text-sm sm:text-base text-[var(--text-secondary)] max-w-2xl leading-relaxed font-normal">
+        官宣與傳聞兩類分開看，左右可切換遊戲。消息由各戰隊名冊的變動自動產生。
+      </p>
+    </div>
+
+    <TransferMovesSidebar
+      client:load
+      moves={moves}
+      showHeading={false}
+      className="max-w-2xl"
+      listClassName="grid grid-cols-1 sm:grid-cols-2 gap-2"
+      entranceClassName="sm:max-w-sm"
+    />
+  </div>
+</Base>

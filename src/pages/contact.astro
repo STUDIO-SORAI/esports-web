@@ -1,0 +1,58 @@
+---
+import Legal from '../layouts/Legal.astro'
+import { CONTACT_EMAIL } from '../lib/config'
+---
+
+<Legal
+  title="聯絡我們"
+  description="更正、授權、合作或一般來信，請透過下列管道聯繫 SORAI ESPORTS 編輯室。"
+  updated="2026 年 8 月 22 日"
+>
+  <section>
+    <h2>編輯室</h2>
+    <p>
+      本站由 SORAI ESPORTS 編輯室營運。來信請盡量附上文章網址、你的姓名與可回覆的聯絡方式，方便我們處理。
+    </p>
+    {
+      CONTACT_EMAIL ? (
+        <p>
+          公開聯絡信箱：
+          <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
+        </p>
+      ) : (
+        <p>
+          目前請透過下方讀者投稿表單，或文章頁作者公開信箱與我們聯繫。
+        </p>
+      )
+    }
+  </section>
+
+  <section>
+    <h2>讀者投稿</h2>
+    <p>
+      若你想提供賽事觀察、專欄或獨家消息，請使用 <a href="/submit">讀者投稿</a>。稿件經審核後才會刊登，規範會在投稿頁完整顯示。
+    </p>
+  </section>
+
+  <section>
+    <h2>更正與權利人通知</h2>
+    <p>
+      若你認為某篇文章事實有誤，或你是圖片、文字的權利人、認為本站使用方式有疑義，請來信並附上：
+    </p>
+    <ul>
+      <li>文章網址</li>
+      <li>需要更正或下架的具體內容</li>
+      <li>你與該內容的關係（作者、權利人、當事人或代理人）</li>
+    </ul>
+    <p>我們會在合理期間內查核並回覆。</p>
+  </section>
+
+  <section>
+    <h2>不處理的事項</h2>
+    <ul>
+      <li>要求我們點擊廣告或承諾廣告成效</li>
+      <li>與本站內容無關的大量行銷信件</li>
+      <li>未具名、無法核實的指控</li>
+    </ul>
+  </section>
+</Legal>

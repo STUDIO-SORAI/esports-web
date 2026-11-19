@@ -1,0 +1,492 @@
+---
+import Base from '../../layouts/Base.astro'
+import {
+  fetchPost,
+  fetchAuthors,
+  fetchPosts,
+  parseMaybeJsonArray,
+  formatDate,
+  getReadTime,
+  categoryFromPost,
+  hasTourRosterTag,
+  fetchNavCategories,
+} from '../../lib/api'
+import { MarkdownContent } from '../../components/MarkdownContent'
+import {
+  ArrowLeftIcon,
+  TwitterIcon,
+  InstagramIcon,
+  ThreadsIcon,
+  TwitchIcon,
+  YoutubeIcon,
+  WebsiteIcon,
+  MailIcon,
+} from '../../components/Icons'
+import { CompactCard } from '../../components/Cards'
+import { ShareBlock } from '../../components/ShareBlock'
+import { LivePreviewListener } from '../../components/LivePreviewListener'
+import { GoogleSourceSlugCard } from '../../components/GoogleSourceSlugCard'
+import { SponsorHeaderBanner } from '../../components/SponsorHeaderBanner'
+
+import { GOOGLE_SOURCE_URL } from '../../components/GoogleSourceBanner'
+import { CATEGORY_FALLBACK, DEFAULT_OG_IMAGE, categoryPath, topicPath, getCategoryLogo } from '../../lib/config'
+import {
+  absoluteUrl,
+  breadcrumbJsonLd,
+  newsArticleJsonLd,
+  siteOrigin,
+  toPlainShareTitle,
+} from '../../lib/seo'
+
+const { slug } = Astro.params
+const isPreview = Astro.url.searchParams.get('preview') === 'true'
+const origin = siteOrigin(Astro.request, Astro.url)
+const shareUrl = `${origin}/post/${slug}`
+let post = await fetchPost(slug!, isPreview)
+
+if (!post && !isPreview) {
+  Astro.response.status = 404
+  return Astro.rewrite('/404')
+}
+
+if (!post && isPreview) {
+  post = {
+    id: 'preview',
+    slug: slug || 'preview',
+    title: '即時預覽中...',
+    description: '',
+    content: '',
+    body: '',
+    rawContent: '',
+    coverImage: '',
+    ogImage: '',
+    category: '',
+    tags: [],
+    authors: JSON.stringify([]),
+    publishedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    wordCount: 0,
+    status: 'draft',
+  }
+}
+
+// Fetch Authors
+const authorIds = parseMaybeJsonArray(post.authors)
+const authors = await fetchAuthors(authorIds)
+
+// Fetch Related Posts
+const allPosts = await fetchPosts()
+const category = categoryFromPost(post)
+const cmsNavCategories = await fetchNavCategories().catch(() => [])
+const navCategories =
+  cmsNavCategories.length > 0
+    ? cmsNavCategories.map(({ name, slug }) => ({ name, slug }))
+    : [...CATEGORY_FALLBACK]
+// 文章自帶的 categorySlug 最準；沒有就用名稱回查。
+const postCategorySlug =
+  post.categorySlug ||
+  navCategories.find((c) => c.name.trim().toLowerCase() === category.trim().toLowerCase())?.slug ||
+  ''
+const relatedPosts = allPosts
+  .filter(
+    (p) =>
+      p.slug !== post.slug &&
+      !hasTourRosterTag(p) &&
+      parseMaybeJsonArray(p.tags).includes(category)
+  )
+  .slice(0, 4)
+
+if (relatedPosts.length < 4) {
+  const extra = allPosts
+    .filter(
+      (p) =>
+        p.slug !== post.slug &&
+        !hasTourRosterTag(p) &&
+        !parseMaybeJsonArray(p.tags).includes(category)
+    )
+    .slice(0, 4 - relatedPosts.length)
+  relatedPosts.push(...extra)
+}
+
+const displayTitle = toPlainShareTitle(post.title)
+const relatedPostsDisplay = relatedPosts.map((p) => ({
+  ...p,
+  title: toPlainShareTitle(p.title),
+}))
+
+const content = post.rawContent || post.body || post.content || ''
+const DEFAULT_IMAGE =
+  'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9IiNlY2VjZWMiLz48bGluZSB4MT0iMCIgeTE9IjAiIHgyPSIxMDAlIiB5Mj0iMTAwJSIgc3Ryb2tlPSIjZGFkYWRhIiBzdHJva2Utd2lkdGg9IisyIi8+PGxpbmUgeDE9IjEwMCUiIHkxPSIwIiB4Mj0iMCIgeTI9IjEwMCUiIHN0cm9rZT0iI2RhZGFkYSIgc3Ryb2tlLXdpZHRoPSIyIi8+PC9zdmc+'
+
+
+const pageImage = post.ogImage || post.coverImage || DEFAULT_OG_IMAGE
+const articleJsonLd = isPreview
+  ? []
+  : [
+      newsArticleJsonLd({
+        origin,
+        post,
+        authors,
+        url: shareUrl,
+        image: absoluteUrl(origin, pageImage),
+      }),
+      breadcrumbJsonLd(origin, [
+        { name: '首頁', path: '/' },
+        ...(category
+          ? [{ name: category, path: categoryPath(postCategorySlug) }]
+          : []),
+        { name: displayTitle, path: `/post/${slug}` },
+      ]),
+    ]
+---
+
+<Base
+  title={post.title}
+  description={post.description}
+  image={pageImage}
+  type="article"
+  canonical={shareUrl}
+  noindex={isPreview}
+  publishedTime={post.publishedAt}
+  modifiedTime={post.updatedAt || post.publishedAt}
+  jsonLd={articleJsonLd}
+>
+  <article class="min-h-screen bg-[var(--background)] text-[var(--foreground)] pb-20 relative font-sans">
+    <!-- 3-Column Layout Wrapper: Left(13%) + Center(70%) + Right(13%) -->
+    <div class="w-full max-w-full overflow-hidden xl:overflow-visible flex flex-col xl:flex-row justify-between items-start pt-8 xl:pt-16 px-4 xl:px-[2%] gap-8 xl:gap-[2%]">
+      <!-- LEFT SIDEBAR: Author Info -->
+      <aside class="arc-entrance hidden xl:flex w-[13%] shrink-0 sticky top-24 h-[calc(100vh-8rem)] flex-col justify-between items-center overflow-hidden pb-4" style="--stagger: 0;">
+        <div class="flex flex-col items-center w-full gap-8">
+          <h3 class="text-sm font-medium tracking-tight text-[var(--foreground)] w-full mb-3 text-center">作者簡介</h3>
+          <div class="flex flex-col items-center gap-8 w-full">
+            {
+              authors.map((author) => (
+                <div class="flex flex-col items-center gap-3 w-full">
+                  {author.image ? (
+                    <img
+                      src={author.image}
+                      alt={author.name}
+                      class="w-16 h-16 xl:w-20 xl:h-20 rounded-full object-cover shadow-sm bg-[var(--surface)] dark:bg-[#222] p-0.5  shrink-0"
+                    />
+                  ) : (
+                    <div class="w-16 h-16 xl:w-20 xl:h-20 rounded-full bg-[var(--surface-muted)]  flex items-center justify-center text-[var(--foreground)] font-medium text-xl shrink-0">
+                      {author.name.charAt(0)}
+                    </div>
+                  )}
+                  <div class="flex flex-col items-center w-full px-1">
+                    <span class="font-medium text-[var(--foreground)] text-sm xl:text-base break-words text-center">
+                      {author.name}
+                    </span>
+                    {author.bio && (
+                      <span class="text-[var(--text-secondary)] text-xs leading-relaxed mt-2 break-words text-center whitespace-pre-wrap">
+                        {author.bio}
+                      </span>
+                    )}
+                    {
+                      (author.socials && Object.values(author.socials).some(Boolean)) || author.contactEmail ? (
+                        <div class="flex flex-wrap items-center justify-center gap-1.5 mt-3 pt-3  w-full">
+                          {author.socials?.twitter && (
+                            <a
+                              href={author.socials.twitter.startsWith('http') ? author.socials.twitter : `https://x.com/${author.socials.twitter}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="w-7 h-7 flex items-center justify-center shrink-0 rounded hover:bg-zinc-200/50 dark:hover:bg-zinc-800 transition-[background-color,opacity] opacity-70 hover:opacity-100"
+                              title="X (Twitter)"
+                              aria-label="X (Twitter)"
+                            >
+                              <img src="/socials/x.svg" alt="X" class="w-4 h-4 object-contain brightness-0 dark:invert" />
+                            </a>
+                          )}
+                          {author.socials?.threads && (
+                            <a
+                              href={author.socials.threads.startsWith('http') ? author.socials.threads : `https://threads.net/@${author.socials.threads}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="w-7 h-7 flex items-center justify-center shrink-0 rounded hover:bg-zinc-200/50 dark:hover:bg-zinc-800 transition-[background-color,opacity] opacity-70 hover:opacity-100"
+                              title="Threads"
+                              aria-label="Threads"
+                            >
+                              <img src="/socials/threads.png" alt="Threads" class="w-4 h-4 object-contain brightness-0 dark:invert" />
+                            </a>
+                          )}
+                          {author.socials?.instagram && (
+                            <a
+                              href={author.socials.instagram.startsWith('http') ? author.socials.instagram : `https://instagram.com/${author.socials.instagram}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="w-7 h-7 flex items-center justify-center shrink-0 rounded hover:bg-zinc-200/50 dark:hover:bg-zinc-800 transition-[background-color,opacity] opacity-70 hover:opacity-100"
+                              title="Instagram"
+                              aria-label="Instagram"
+                            >
+                              <img src="/socials/instagram.svg" alt="Instagram" class="w-4 h-4 object-contain brightness-0 dark:invert" />
+                            </a>
+                          )}
+                          {author.socials?.twitch && (
+                            <a
+                              href={author.socials.twitch.startsWith('http') ? author.socials.twitch : `https://twitch.tv/${author.socials.twitch}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="w-7 h-7 flex items-center justify-center shrink-0 rounded hover:bg-zinc-200/50 dark:hover:bg-zinc-800 transition-[background-color,opacity] opacity-70 hover:opacity-100"
+                              title="Twitch"
+                              aria-label="Twitch"
+                            >
+                              <img src="/socials/twitch.svg" alt="Twitch" class="w-4 h-4 object-contain brightness-0 dark:invert" />
+                            </a>
+                          )}
+                          {author.socials?.youtube && (
+                            <a
+                              href={author.socials.youtube.startsWith('http') ? author.socials.youtube : `https://youtube.com/${author.socials.youtube}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="w-7 h-7 flex items-center justify-center shrink-0 rounded hover:bg-zinc-200/50 dark:hover:bg-zinc-800 transition-[background-color,opacity] opacity-70 hover:opacity-100"
+                              title="YouTube"
+                              aria-label="YouTube"
+                            >
+                              <img src="/socials/youtube.svg" alt="YouTube" class="w-4 h-4 object-contain brightness-0 dark:invert" />
+                            </a>
+                          )}
+                          {author.socials?.website && (
+                            <a
+                              href={author.socials.website.startsWith('http') ? author.socials.website : `https://${author.socials.website}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="w-7 h-7 flex items-center justify-center shrink-0 rounded hover:bg-zinc-200/50 dark:hover:bg-zinc-800 transition-[background-color,opacity] opacity-70 hover:opacity-100"
+                              title="個人網站"
+                              aria-label="個人網站"
+                            >
+                              <img src="/socials/globe.svg" alt="Website" class="w-4 h-4 object-contain brightness-0 dark:invert" />
+                            </a>
+                          )}
+                          {author.contactEmail && (
+                            <a
+                              href={`mailto:${author.contactEmail}`}
+                              class="w-7 h-7 flex items-center justify-center shrink-0 rounded hover:bg-zinc-200/50 dark:hover:bg-zinc-800 transition-[background-color,opacity] opacity-70 hover:opacity-100"
+                              title={`聯絡作者 (${author.contactEmail})`}
+                              aria-label="聯絡作者"
+                            >
+                              <img src="/socials/mail.svg" alt="Email" class="w-4 h-4 object-contain brightness-0 dark:invert" />
+                            </a>
+                          )}
+                        </div>
+                      ) : null
+                    }
+                  </div>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+
+        {/* 固定最底：整塊 GoogleSourceSlugCard 模組（專屬 slug 頁面） */}
+        <div class="w-full mt-auto pt-6">
+          <GoogleSourceSlugCard client:load />
+        </div>
+      </aside>
+
+      <!-- CENTER MAIN CONTENT: Exactly 70% -->
+      <div class="arc-entrance w-full xl:w-[70%] max-w-full shrink-0 flex flex-col bg-[var(--background)]" style="--stagger: 1;">
+        <!-- Navigator -->
+        <div class="w-full mb-8">
+          <a
+            href="/"
+            class="flex items-center justify-center gap-2 text-[var(--text-secondary)] hover:text-[var(--foreground)] px-4 py-3 rounded-[var(--radius-control)] text-sm font-medium transition-colors  hover:bg-[var(--surface-muted)] w-full"
+          >
+            <ArrowLeftIcon client:load size={16} /> 返回首頁
+          </a>
+        </div>
+
+        <!-- Header -->
+        <div class="w-full flex flex-col px-4 xl:px-0">
+          <div class="flex flex-wrap items-center justify-center gap-2 mb-4">
+            {
+              category && postCategorySlug && (
+                <a
+                  href={categoryPath(postCategorySlug)}
+                  class="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold tracking-wide text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors group"
+                >
+                  {getCategoryLogo(category) ? (
+                    <img
+                      src={getCategoryLogo(category)!}
+                      class="w-4 h-4 object-contain shrink-0"
+                      alt={category}
+                    />
+                  ) : null}
+                  <span>#{category}</span>
+                </a>
+              )
+            }
+          </div>
+
+          <div class="flex flex-wrap items-center justify-center gap-2 text-[var(--text-secondary)] text-sm mb-5">
+            <span>{formatDate(post.publishedAt || post.updatedAt).replace(/-/g, '.')}</span>
+            <span class="mx-1">•</span>
+            <span>{getReadTime(post)}</span>
+            {
+              authors.length > 0 && (
+                <>
+                  <span class="mx-1">•</span>
+                  <span>By {authors.map((a) => a.name).join(', ')}</span>
+                </>
+              )
+            }
+          </div>
+
+          <h1
+            id="post-title"
+            class="text-3xl sm:text-5xl md:text-[3.5rem] lg:text-[4rem] font-bold leading-[1.08] text-[var(--foreground)] text-center mb-6 tracking-tight font-en"
+          >
+            {displayTitle}
+          </h1>
+
+          {
+            post.description ? (
+              <p id="post-description" class="text-sm md:text-lg text-[var(--text-secondary)] leading-relaxed text-center max-w-4xl mx-auto mb-8 font-medium">
+                {post.description}
+              </p>
+            ) : (
+              <p id="post-description" class="text-sm md:text-lg text-[var(--text-secondary)] leading-relaxed text-center max-w-4xl mx-auto mb-8 font-medium" style="display: none;">
+              </p>
+            )
+          }
+        </div>
+
+        <!-- Hero Image area -->
+        <div class="w-full relative mt-0">
+          <div class="relative w-full skullet-bone skullet-sweep rounded-[var(--radius-panel)] overflow-hidden">
+            <img
+              id="post-hero-image"
+              src={post.coverImage || DEFAULT_IMAGE}
+              alt={displayTitle}
+              class="skullet-img w-full h-auto max-h-[80vh] object-cover block m-0"
+              onload="this.dataset.loaded='true'"
+            />
+          </div>
+        </div>
+
+        <!-- Google Source (Mobile only) & Sponsor SORAI Banner (Desktop & Mobile) -->
+        <div class="w-full px-4 xl:px-8 mt-6">
+          <div class="max-w-[768px] mx-auto flex flex-col gap-3">
+            <div class="xl:hidden">
+              <GoogleSourceSlugCard client:load />
+            </div>
+            <SponsorHeaderBanner client:load />
+          </div>
+        </div>
+
+        <!-- Article Body -->
+        <div class="w-full px-4 xl:px-8 mt-8 xl:mt-12">
+          <div class="prose-container max-w-[768px] mx-auto text-[var(--foreground)]" id="post-content">
+            <MarkdownContent client:load content={content} notebooks={post.notebooks} isPreview={isPreview} />
+          </div>
+
+          {isPreview && <LivePreviewListener client:load />}
+
+          <!-- Share Button -->
+          <div class="mt-12 flex justify-center  pt-8 mb-8">
+            <ShareBlock client:load title={displayTitle} url={shareUrl} />
+          </div>
+
+          <!-- Footer Topic Tags -->
+          {
+            parseMaybeJsonArray(post.tags).length > 0 && (
+              <div class="mt-16 pt-8  flex flex-wrap gap-3 items-center">
+                <span class="text-[var(--text-muted)] font-bold mr-2">
+                  話題標籤：
+                </span>
+                {parseMaybeJsonArray(post.tags).map((tag) => (
+                  <a
+                    href={topicPath(tag, navCategories)}
+                    class="bg-transparent  px-4 py-1.5 rounded-full text-xs font-medium text-[var(--text-secondary)]  hover:text-[var(--foreground)] active:scale-[0.98] transition-[color,transform] duration-150 no-underline"
+                  >
+                    #{tag}
+                  </a>
+                ))}
+              </div>
+            )
+          }
+        </div>
+      </div>
+
+      <!-- RIGHT SIDEBAR: Related Posts -->
+      <aside class="arc-entrance hidden xl:flex w-[13%] shrink-0 sticky top-24 flex-col items-center gap-6" style="--stagger: 2;">
+        <h3 class="text-sm font-bold tracking-tight text-[var(--foreground)] w-full mb-3 text-center">延伸閱讀</h3>
+        <div class="flex flex-col gap-6 w-full">
+          {
+            relatedPostsDisplay.map((p) => (
+              <a href={`/post/${p.slug}`} class="group flex flex-col rounded-[var(--radius-panel)]  bg-[var(--surface)] hover:bg-[var(--surface-muted)]  overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99] transition-[transform,background-color,box-shadow] duration-200 w-full">
+                <div class="w-full aspect-video overflow-hidden bg-[var(--surface-muted)] skullet-bone skullet-sweep shrink-0">
+                  <img
+                    src={p.coverImage || DEFAULT_IMAGE}
+                    class="skullet-img w-full h-full object-cover cover-zoom"
+                    alt={p.title}
+                    onload="this.dataset.loaded='true'"
+                  />
+                </div>
+                <div class="p-2.5 flex flex-col gap-1 w-full">
+                  <h4 class="text-xs font-bold text-[var(--foreground)] line-clamp-2 group-hover:text-[var(--accent)] transition-colors leading-snug tracking-tight">
+                    {p.title}
+                  </h4>
+                  <span class="text-[11px] text-[var(--text-muted)]">
+                    {formatDate(p.publishedAt || p.updatedAt).replace(/-/g, '.')}
+                  </span>
+                </div>
+              </a>
+            ))
+          }
+        </div>
+      </aside>
+
+      <!-- Mobile-only sidebars -->
+      <div class="w-full px-4 flex flex-col gap-12 mt-16 xl:hidden text-[var(--foreground)]">
+        {
+          authors.length > 0 && (
+            <div>
+              <h3 class="text-xl font-bold tracking-tight text-[var(--foreground)] mb-4">作者簡介</h3>
+              <div class="flex flex-col gap-6">
+                {authors.map((author) => (
+                  <div class="flex flex-col gap-3 p-4  rounded bg-[var(--surface-elevated)] dark:bg-[#111]">
+                    <div class="flex items-center gap-4">
+                      {author.image ? (
+                        <img
+                          src={author.image}
+                          alt={author.name}
+                          class="w-12 h-12 rounded-full object-cover shrink-0 "
+                        />
+                      ) : (
+                        <div class="w-12 h-12 rounded-full bg-[var(--surface-muted)]  flex items-center justify-center text-[var(--foreground)] font-medium shrink-0">
+                          {author.name.charAt(0)}
+                        </div>
+                      )}
+                      <span class="font-medium text-[var(--foreground)] text-base">
+                        {author.name}
+                      </span>
+                    </div>
+                    {author.bio && (
+                      <span class="text-[var(--text-secondary)] text-sm leading-relaxed whitespace-pre-wrap">
+                        {author.bio}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        }
+
+        <div>
+          <h3 class="text-xl font-bold tracking-tight text-[var(--foreground)] mb-4">延伸閱讀</h3>
+          <div class="flex flex-col gap-2">
+            {relatedPostsDisplay.map((p) => <CompactCard client:load post={p} />)}
+          </div>
+        </div>
+      </div>
+    </div>
+  </article>
+  <script is:inline id="skullet-cache-check">
+    document.querySelectorAll('img.skullet-img').forEach(function(img) {
+      if (img.complete && img.naturalWidth > 0) {
+        img.dataset.loaded = 'true';
+      }
+    });
+  </script>
+</Base>

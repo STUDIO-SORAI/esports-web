@@ -1,0 +1,29 @@
+---
+import Base from '../layouts/Base.astro'
+import MatchesPage from '../components/MatchesPage'
+import { fetchAllTournamentEvents, fetchAllMatches } from '../lib/pandascore'
+
+const emptyMatches = { running: [], upcoming: [], finished: [] }
+const emptyTournaments = { running: [], upcoming: [], finished: [] }
+
+const [matchesResult, tournamentsResult] = await Promise.allSettled([
+  fetchAllMatches(),
+  fetchAllTournamentEvents(),
+])
+
+const matches =
+  matchesResult.status === 'fulfilled' ? matchesResult.value : emptyMatches
+const tournaments =
+  tournamentsResult.status === 'fulfilled'
+    ? tournamentsResult.value
+    : emptyTournaments
+---
+
+<Base
+  title="賽事資訊"
+  description="整理特戰英豪、英雄聯盟、虹彩六號與 CS2 的進行中對局、近期賽程與主要大賽狀態。"
+>
+  <div class="w-full pt-10 pb-16 min-h-[60vh]">
+    <MatchesPage client:load matches={matches} tournaments={tournaments} />
+  </div>
+</Base>

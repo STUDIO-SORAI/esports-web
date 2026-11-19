@@ -1,0 +1,31 @@
+---
+import Base from '../layouts/Base.astro'
+import FeedPage from '../components/FeedPage'
+import { fetchBriefs, fetchNavCategories } from '../lib/api'
+import { SITE_NAME, siteOrigin } from '../lib/seo'
+import { CATEGORY_FALLBACK } from '../lib/config'
+
+const origin = siteOrigin(Astro.request, Astro.url)
+const briefs = await fetchBriefs(100).catch(() => [])
+const nav = await fetchNavCategories().catch(() => [])
+const games = (nav.length > 0 ? nav : CATEGORY_FALLBACK).filter(
+  (c) => c.slug !== 'opinion' && c.name !== '專欄報導'
+)
+
+const selectedParam = Astro.url.searchParams.get('c') || 'all'
+---
+
+<Base
+  title="電競快訊"
+  description={`${SITE_NAME} 電競快訊：即時掌握賽事速報、轉會異動與電競快訊。`}
+  canonical={`${origin}/feed`}
+>
+  <div class="w-full bg-[var(--background)] text-[var(--foreground)] font-sans min-h-screen overflow-x-hidden">
+    <FeedPage
+      client:load
+      briefs={briefs}
+      games={games}
+      initialCategory={selectedParam}
+    />
+  </div>
+</Base>

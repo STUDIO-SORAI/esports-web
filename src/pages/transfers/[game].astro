@@ -1,0 +1,32 @@
+---
+import Base from '../../layouts/Base.astro'
+import { TransfersPage } from '../../components/transfers/TransfersPage'
+import { fetchTransfers, fetchTransferRegions } from '../../lib/api'
+import { resolveTransferGame } from '../../lib/transfers'
+
+const { game } = Astro.params
+// 四個 slug 都是純 ASCII，不解碼：decodeURIComponent 遇到畸形轉義會丟例外，變成 500 而不是 404。
+const page = resolveTransferGame(game || '')
+
+if (!page) {
+  return new Response(null, { status: 404, statusText: 'Not Found' })
+}
+
+// 賽區分頁是 CMS 資料，每款遊戲各一組；沒建任何賽區的遊戲就不顯示分頁列
+const [initialTeams, regions] = await Promise.all([
+  fetchTransfers(page.slug),
+  fetchTransferRegions(page.slug),
+])
+---
+
+<Base title={page.title} description={page.description}>
+  <div class="w-full pt-3 pb-16 min-h-[70vh]">
+    <TransfersPage
+      client:load
+      initialTeams={initialTeams}
+      game={page.slug}
+      intro={page.intro}
+      regions={regions}
+    />
+  </div>
+</Base>

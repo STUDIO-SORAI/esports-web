@@ -1,0 +1,68 @@
+---
+import Base from '../../layouts/Base.astro'
+import { fetchPosts, fetchNavCategories } from '../../lib/api'
+import { CATEGORY_FALLBACK, topicPath } from '../../lib/config'
+import { buildTopicIndex } from '../../lib/topics'
+import { InViewTitle } from '../../components/arc/in-view-title/in-view-title'
+
+const posts = await fetchPosts()
+
+const cmsNavCategories = await fetchNavCategories().catch(() => [])
+const navCategories =
+  cmsNavCategories.length > 0
+    ? cmsNavCategories.map(({ name, slug }) => ({ name, slug }))
+    : [...CATEGORY_FALLBACK]
+
+// 與首頁右欄共用同一份主題索引：主分類已有導覽列與專屬頁，不在這裡重覆列。
+const sortedTags = buildTopicIndex(posts, navCategories)
+---
+
+<Base title="所有主題" description="瀏覽 SORAI ESPORTS 的所有新聞主題與標籤">
+  <div
+    class="w-full bg-[var(--background)] text-[var(--foreground)] min-h-screen selection:bg-[var(--accent-subtle)] pt-12 xl:pt-16 pb-20 font-sans"
+  >
+    <div class="w-full xl:w-[70%] max-w-full mx-auto px-4 xl:px-0">
+      <header class="mb-14 flex flex-col items-center justify-center text-center arc-entrance" style="--stagger: 0;">
+        <InViewTitle
+          client:visible
+          text="所有主題"
+          variant="blur"
+          className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-[var(--foreground)]"
+        />
+        <p
+          class="mt-4 text-[var(--text-secondary)] font-normal text-sm md:text-base"
+        >
+          探索全站共 {sortedTags.length} 個話題標籤
+        </p>
+      </header>
+
+      {
+        sortedTags.length === 0 ? (
+          <div class="text-center py-24 bg-[var(--surface-muted)] rounded-[var(--radius-panel)] ">
+            <h2 class="text-2xl font-bold text-[var(--foreground)]">目前沒有標籤</h2>
+            <p class="text-[var(--text-secondary)] mt-4 text-sm font-normal">
+              請稍後再回來查看。
+            </p>
+          </div>
+        ) : (
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5">
+            {sortedTags.map(({ name: tag, count }, i) => (
+              <a
+                href={topicPath(tag, navCategories)}
+                class="arc-reveal group flex flex-col p-5 md:p-6 rounded-[var(--radius-panel)]  bg-[var(--surface)] hover:bg-[var(--surface-muted)]  shadow-xs hover:shadow-md hover:-translate-y-1 active:scale-[0.98] transition-[transform,background-color,box-shadow] duration-200 items-center justify-center text-center gap-2"
+                style={`--stagger: ${i % 12};`}
+              >
+                <span class="text-base sm:text-lg md:text-xl font-bold text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors break-words line-clamp-1 w-full tracking-tight">
+                  #{tag}
+                </span>
+                <span class="text-xs font-normal text-[var(--text-secondary)] tabular-nums">
+                  {count} 篇報導
+                </span>
+              </a>
+            ))}
+          </div>
+        )
+      }
+    </div>
+  </div>
+</Base>
